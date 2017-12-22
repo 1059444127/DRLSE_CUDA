@@ -60,6 +60,8 @@ int main(int argc, char** argv)
     widget.show();
 
     app.exec();
+
+    return 0;
 }
 
 // Helper function for using CUDA to add vectors in parallel.

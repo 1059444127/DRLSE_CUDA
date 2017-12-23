@@ -20,9 +20,11 @@ class MainWindow : public QMainWindow
 
     private slots:
     void on_actionOpenFile_triggered();
+    void on_actionOpen_Folder_triggered();
     void on_actionExit_triggered();
+    void on_actionReset_view_triggered();
 
-    private:
+private:
     //Pointer to the class inside the Ui namespace
     Ui::MainWindow *ui;
 

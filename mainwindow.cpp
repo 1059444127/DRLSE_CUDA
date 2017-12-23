@@ -9,6 +9,12 @@
 #include <QMessageBox>
 
 #include <vtkRenderWindow.h>
+#include <vtkImageMapper3D.h>
+#include <vtkImageActor.h>
+#include <vtkCamera.h>
+#include <vtkDICOMImageReader.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleImage.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -35,24 +41,68 @@ void MainWindow::on_actionOpenFile_triggered()
 {
     //getOpenFileName displays a file dialog and returns the full file path of the selected file, or an empty string if the user canceled the dialog
     //The tr() function makes the dialog language proof (chinese characters, etc)
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open Thorlabs Image"), QString(), tr("Text Files (*.txt)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Pick a DICOM file"), QString(), tr("All files (*.*);;DICOM FILES (*.dcm)"));
 
     if(!fileName.isEmpty())
     {
+        std::string fileNameStd = fileName.toStdString();
+
+        //Read all DICOM files in the specified directory
+        VTK_NEW(vtkDICOMImageReader, dicomReader);
+        dicomReader->SetFileName(fileNameStd.c_str());
+        dicomReader->Update();
+
+//        VTK_NEW(vtkImageMapper3D, mapper);
+//        mapper->SetInputConnection(dicomReader->GetOutputPort());
+//        mapper->SetColorWindow(255);
+//        mapper->SetColorLevel(127.5);
+
+        VTK_NEW(vtkImageActor, actor);
+        actor->GetMapper()->SetBackground(125);
+        actor->GetMapper()->SetInputConnection(dicomReader->GetOutputPort());
+
+        VTK_NEW(vtkRenderWindowInteractor, interactor);
+        interactor->SetRenderWindow(m_renderer->GetRenderWindow());
+
+        VTK_NEW(vtkInteractorStyleImage, style);
+        interactor->SetInteractorStyle(style);
+
+        m_renderer->RemoveAllViewProps();
+        m_renderer->AddActor(actor);
+        m_renderer->ResetCamera();
+
+        interactor->Start();
+    }
+}
+
+void MainWindow::on_actionOpen_Folder_triggered()
+{
+    //getOpenFileName displays a file dialog and returns the full file path of the selected file, or an empty string if the user canceled the dialog
+    //The tr() function makes the dialog language proof (chinese characters, etc)
+    //QString fileName = QFileDialog::getOpenFileName(this, tr("Pick a DICOM file"), QString(), tr("Text Files (*.txt)"));
+
+    //QString folderName = QFileDialog::getExistingDirectory(this, tr("Open Directory"), "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+
+//    if(!folderName.isEmpty())
+//    {
+//        //Read all DICOM files in the specified directory
+//        VTK_NEW(vtkDICOMImageReader, dicomReader);
+//        dicomReader->SetFileN
+
         //Create an input file stream
-        std::ifstream inputFile(fileName.toStdString().c_str());
+//        std::ifstream inputFile(fileName.toStdString().c_str());
 
-        //If the file isn't open, show an error box
-        if(!inputFile)
-        {
-            QMessageBox::critical(this, tr("Error"), tr("Could not open file"));
-            return;
-        }
+//        //If the file isn't open, show an error box
+//        if(!inputFile)
+//        {
+//            QMessageBox::critical(this, tr("Error"), tr("Could not open file"));
+//            return;
+//        }
 
-        //Get the file size
-        inputFile.seekg(0, std::ios::end);
-        int fileSize = inputFile.tellg();
-        inputFile.seekg(0, std::ios::beg);
+//        //Get the file size
+//        inputFile.seekg(0, std::ios::end);
+//        int fileSize = inputFile.tellg();
+//        inputFile.seekg(0, std::ios::beg);
 
 //        //Read the file into data
 //        std::vector<uint8_t> data(fileSize);
@@ -78,10 +128,17 @@ void MainWindow::on_actionOpenFile_triggered()
 
 //        //Renders the oct data
 //        this->renderOctRaw();
-    }
+//    }
 }
 
 void MainWindow::on_actionExit_triggered()
 {
     qApp->exit();
+}
+
+void MainWindow::on_actionReset_view_triggered()
+{
+    m_renderer->ResetCamera();
+    m_renderer->GetActiveCamera()->SetViewUp(0,1,0);
+    this->ui->qvtkWidget->repaint();
 }

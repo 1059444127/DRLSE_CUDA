@@ -15,6 +15,8 @@
 #include <vtkDICOMImageReader.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkInteractorStyleImage.h>
+#include <vtkLineSource.h>
+#include <vtkPolyDataMapper.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -45,6 +47,24 @@ void MainWindow::ShowStatus(std::string message)
 
 void MainWindow::on_actionOpenFile_triggered()
 {
+    double p0[3] = {0.0, 0.0, 1.0};
+    double p1[3] = {250.0, 250.0, 1.0};
+    VTK_NEW(vtkLineSource, lineSource);
+    lineSource->SetPoint1(p0);
+    lineSource->SetPoint2(p1);
+    lineSource->Update();
+
+    VTK_NEW(vtkPolyDataMapper, polyMapper);
+    polyMapper->SetInputConnection(lineSource->GetOutputPort());
+
+    VTK_NEW(vtkActor, lineActor);
+    lineActor->SetMapper(polyMapper);
+
+    m_renderer->AddActor(lineActor);
+    m_renderer->ResetCamera();
+    m_renderer->Render();
+    this->ui->qvtkWidget->repaint();
+
     //getOpenFileName displays a file dialog and returns the full file path of the selected file, or an empty string if the user canceled the dialog
     //The tr() function makes the dialog language proof (chinese characters, etc)
     QString fileName = QFileDialog::getOpenFileName(this, tr("Pick a DICOM file"), QString(), tr("All files (*.*);;DICOM FILES (*.dcm)"));
@@ -63,19 +83,19 @@ void MainWindow::on_actionOpenFile_triggered()
         m_mainActor->GetMapper()->SetBackground(125);
         m_mainActor->GetMapper()->SetInputData(dicomImage);
 
+        //Gets bounds in world coordinates (real space)
+        double bounds[6] = {0};
+        m_mainActor->GetBounds(bounds);
+
         VTK_NEW(vtkRenderWindowInteractor, interactor);
         interactor->SetRenderWindow(m_renderer->GetRenderWindow());
 
         VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
 
-        m_renderer->RemoveAllViewProps();
+        //m_renderer->RemoveAllViewProps();
         m_renderer->AddActor(m_mainActor);
         m_renderer->ResetCamera();
-
-//        int res = runCuda();
-//        std::string resStr = std::to_string(res);
-//        this->statusBar()->showMessage(resStr.c_str());
 
         interactor->Start();
     }

@@ -83,6 +83,8 @@
      <string>Tools</string>
     </property>
     <addaction name="actionTest_CUDA"/>
+    <addaction name="actionCreate_polyline"/>
+    <addaction name="actionClear_polylines"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
@@ -130,6 +132,16 @@
   <action name="actionTest_CUDA">
    <property name="text">
     <string>Test CUDA</string>
+   </property>
+  </action>
+  <action name="actionCreate_polyline">
+   <property name="text">
+    <string>Create polyline</string>
+   </property>
+  </action>
+  <action name="actionClear_polylines">
+   <property name="text">
+    <string>Clear polylines</string>
    </property>
   </action>
  </widget>

@@ -1,8 +1,11 @@
+#include <vector>
+
 #include <QMainWindow>
 
 #include <vtkSmartPointer.h>
 #include <vtkRenderer.h>
 #include <vtkImageActor.h>
+#include <vtkPolyLineWidget.h>
 
 namespace Ui{
     class MainWindow;
@@ -26,11 +29,13 @@ class MainWindow : public QMainWindow
     void on_actionExit_triggered();
     void on_actionReset_view_triggered();
     void on_actionTest_CUDA_triggered();
+    void on_actionCreate_polyline_triggered();
+    void on_actionClear_polylines_triggered();
 
-    private:
+private:
     Ui::MainWindow *ui;
 
     vtkSmartPointer<vtkImageActor> m_mainActor;
     vtkSmartPointer<vtkRenderer> m_renderer;
-
+    std::vector<vtkPolyLineWidget*> m_polylines;
 };

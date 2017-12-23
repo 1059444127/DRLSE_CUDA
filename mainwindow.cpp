@@ -20,6 +20,8 @@
 #include <vtkPolyLineWidget.h>
 #include <vtkPolyLineRepresentation.h>
 #include <vtkPoints.h>
+#include <vtkPropCollection.h>
+#include <vtkProp.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -77,21 +79,6 @@ void MainWindow::on_actionOpenFile_triggered()
 
         VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
-
-        VTK_NEW(vtkPoints, pts);
-        pts->SetNumberOfPoints(5);
-        pts->SetPoint(0, 0, 0, 0);
-        pts->SetPoint(1, 20, 0, 0);
-        pts->SetPoint(2, 20, 20, 0);
-        pts->SetPoint(3, 25, 40, 0);
-        pts->SetPoint(4, 0, 0, 0);
-
-        VTK_NEW(vtkPolyLineWidget, lineWidget);
-        lineWidget->SetInteractor(interactor);
-        lineWidget->On();
-
-        auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(lineWidget->GetRepresentation());
-        polyLineRep->InitializeHandles(pts);
 
         //m_renderer->RemoveAllViewProps();
         m_renderer->AddActor(m_mainActor);
@@ -180,5 +167,41 @@ void MainWindow::on_actionTest_CUDA_triggered()
     //Display results
     m_mainActor->GetMapper()->RemoveAllInputs();
     m_mainActor->SetInputData(outputData);
+    this->ui->qvtkWidget->repaint();
+}
+
+void MainWindow::on_actionCreate_polyline_triggered()
+{
+    auto interactor = m_renderer->GetRenderWindow()->GetInteractor();
+
+    VTK_NEW(vtkPoints, pts);
+    pts->SetNumberOfPoints(5);
+    pts->SetPoint(0, 0, 0, 0);
+    pts->SetPoint(1, 20, 0, 0);
+    pts->SetPoint(2, 20, 20, 0);
+    pts->SetPoint(3, 25, 40, 0);
+    pts->SetPoint(4, 0, 0, 0);
+
+    VTK_NEW(vtkPolyLineWidget, lineWidget);
+    lineWidget->SetInteractor(interactor);
+    lineWidget->On();
+
+    m_polylines.push_back(lineWidget.GetPointer());
+
+    auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(lineWidget->GetRepresentation());
+    polyLineRep->InitializeHandles(pts);
+
+    this->ui->qvtkWidget->repaint();
+    interactor->Start();
+}
+
+void MainWindow::on_actionClear_polylines_triggered()
+{
+    for(int i = 0; i < m_polylines.size(); i++)
+    {
+        vtkPolyLineWidget* widget = m_polylines[i];
+        widget->Delete();
+    }
+    m_polylines.clear();
     this->ui->qvtkWidget->repaint();
 }

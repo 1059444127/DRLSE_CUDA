@@ -1,11 +1,12 @@
 #include <cuda_runtime.h>
 
+#include <stdio.h>
+
 #include <cudadriver.h>
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
 extern void addKernel(int* c, const int* a, const int* b);
 
-void runCuda()
+int runCuda()
 {
     const int arraySize = 5;
     const int a[arraySize] = { 1, 2, 3, 4, 5 };
@@ -29,6 +30,8 @@ void runCuda()
         fprintf(stderr, "cudaDeviceReset failed!");
         return 1;
     }
+
+    return 0;
 }
 
 // Helper function for using CUDA to add vectors in parallel.

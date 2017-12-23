@@ -1,3 +1,15 @@
+#include <iostream>
+#include <fstream>
+#include <cstring>
+#include <cstdlib>
+#include <assert.h>
+
+#include <QStatusBar>
+#include <QFileDialog>
+#include <QMessageBox>
+
+#include <vtkRenderWindow.h>
+
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 

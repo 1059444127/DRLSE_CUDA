@@ -17,6 +17,9 @@
 #include <vtkInteractorStyleImage.h>
 #include <vtkLineSource.h>
 #include <vtkPolyDataMapper.h>
+#include <vtkPolyLineWidget.h>
+#include <vtkPolyLineRepresentation.h>
+#include <vtkPoints.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -47,24 +50,6 @@ void MainWindow::ShowStatus(std::string message)
 
 void MainWindow::on_actionOpenFile_triggered()
 {
-    double p0[3] = {0.0, 0.0, 1.0};
-    double p1[3] = {250.0, 250.0, 1.0};
-    VTK_NEW(vtkLineSource, lineSource);
-    lineSource->SetPoint1(p0);
-    lineSource->SetPoint2(p1);
-    lineSource->Update();
-
-    VTK_NEW(vtkPolyDataMapper, polyMapper);
-    polyMapper->SetInputConnection(lineSource->GetOutputPort());
-
-    VTK_NEW(vtkActor, lineActor);
-    lineActor->SetMapper(polyMapper);
-
-    m_renderer->AddActor(lineActor);
-    m_renderer->ResetCamera();
-    m_renderer->Render();
-    this->ui->qvtkWidget->repaint();
-
     //getOpenFileName displays a file dialog and returns the full file path of the selected file, or an empty string if the user canceled the dialog
     //The tr() function makes the dialog language proof (chinese characters, etc)
     QString fileName = QFileDialog::getOpenFileName(this, tr("Pick a DICOM file"), QString(), tr("All files (*.*);;DICOM FILES (*.dcm)"));
@@ -92,6 +77,21 @@ void MainWindow::on_actionOpenFile_triggered()
 
         VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
+
+        VTK_NEW(vtkPoints, pts);
+        pts->SetNumberOfPoints(5);
+        pts->SetPoint(0, 0, 0, 0);
+        pts->SetPoint(1, 20, 0, 0);
+        pts->SetPoint(2, 20, 20, 0);
+        pts->SetPoint(3, 25, 40, 0);
+        pts->SetPoint(4, 30, 50, 0);
+
+        VTK_NEW(vtkPolyLineWidget, lineWidget);
+        lineWidget->SetInteractor(interactor);
+        lineWidget->On();
+
+        auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(lineWidget->GetRepresentation());
+        polyLineRep->InitializeHandles(pts);
 
         //m_renderer->RemoveAllViewProps();
         m_renderer->AddActor(m_mainActor);

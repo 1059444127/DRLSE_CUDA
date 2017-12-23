@@ -18,6 +18,8 @@ include_directories(${CUDA_INCLUDE_DIRS})
 # Adds all the desired files to their lists
 set(SOURCES
     main.cpp
+    mainwindow.cpp
+    cudadriver.cpp
     )
 
 set(KERNELS
@@ -25,9 +27,12 @@ set(KERNELS
     )
 
 set(HEADERS
+    mainwindow.h
+    cudadriver.h
     )
 
 set(UI
+    mainwindow.ui
     )
 
 set(RESOURCES

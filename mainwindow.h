@@ -2,6 +2,7 @@
 
 #include <vtkSmartPointer.h>
 #include <vtkRenderer.h>
+#include <vtkImageActor.h>
 
 namespace Ui{
     class MainWindow;
@@ -17,17 +18,19 @@ class MainWindow : public QMainWindow
     public:
     MainWindow();
     ~MainWindow(){};
+    void ShowStatus(std::string message);
 
     private slots:
     void on_actionOpenFile_triggered();
     void on_actionOpen_Folder_triggered();
     void on_actionExit_triggered();
     void on_actionReset_view_triggered();
+    void on_actionTest_CUDA_triggered();
 
-private:
-    //Pointer to the class inside the Ui namespace
+    private:
     Ui::MainWindow *ui;
 
-    //Rendereres
+    vtkSmartPointer<vtkImageActor> m_mainActor;
     vtkSmartPointer<vtkRenderer> m_renderer;
+
 };

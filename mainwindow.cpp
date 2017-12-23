@@ -18,6 +18,7 @@
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "cudadriver.h"
 
 //Makes these long declarations a little more readable
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
@@ -37,6 +38,11 @@ MainWindow::MainWindow()
     this->ui->qvtkWidget->GetRenderWindow()->AddRenderer(m_renderer);
 }
 
+void MainWindow::ShowStatus(std::string message)
+{
+    this->statusBar()->showMessage(QString::fromStdString(message));
+}
+
 void MainWindow::on_actionOpenFile_triggered()
 {
     //getOpenFileName displays a file dialog and returns the full file path of the selected file, or an empty string if the user canceled the dialog
@@ -51,15 +57,11 @@ void MainWindow::on_actionOpenFile_triggered()
         VTK_NEW(vtkDICOMImageReader, dicomReader);
         dicomReader->SetFileName(fileNameStd.c_str());
         dicomReader->Update();
+        auto dicomImage = dicomReader->GetOutput();
 
-//        VTK_NEW(vtkImageMapper3D, mapper);
-//        mapper->SetInputConnection(dicomReader->GetOutputPort());
-//        mapper->SetColorWindow(255);
-//        mapper->SetColorLevel(127.5);
-
-        VTK_NEW(vtkImageActor, actor);
-        actor->GetMapper()->SetBackground(125);
-        actor->GetMapper()->SetInputConnection(dicomReader->GetOutputPort());
+        m_mainActor = vtkSmartPointer<vtkImageActor>::New();
+        m_mainActor->GetMapper()->SetBackground(125);
+        m_mainActor->GetMapper()->SetInputData(dicomImage);
 
         VTK_NEW(vtkRenderWindowInteractor, interactor);
         interactor->SetRenderWindow(m_renderer->GetRenderWindow());
@@ -68,8 +70,12 @@ void MainWindow::on_actionOpenFile_triggered()
         interactor->SetInteractorStyle(style);
 
         m_renderer->RemoveAllViewProps();
-        m_renderer->AddActor(actor);
+        m_renderer->AddActor(m_mainActor);
         m_renderer->ResetCamera();
+
+//        int res = runCuda();
+//        std::string resStr = std::to_string(res);
+//        this->statusBar()->showMessage(resStr.c_str());
 
         interactor->Start();
     }
@@ -140,5 +146,19 @@ void MainWindow::on_actionReset_view_triggered()
 {
     m_renderer->ResetCamera();
     m_renderer->GetActiveCamera()->SetViewUp(0,1,0);
+    this->ui->qvtkWidget->repaint();
+}
+
+void MainWindow::on_actionTest_CUDA_triggered()
+{
+    //Get currently displayed imageData
+    auto inputData = m_mainActor->GetInput();
+
+    //Apply our CUDA kernel to it
+    auto outputData = runCuda(inputData);
+
+    //Display results
+    m_mainActor->GetMapper()->RemoveAllInputs();
+    m_mainActor->SetInputData(outputData);
     this->ui->qvtkWidget->repaint();
 }

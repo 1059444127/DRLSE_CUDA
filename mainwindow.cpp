@@ -84,7 +84,7 @@ void MainWindow::on_actionOpenFile_triggered()
         pts->SetPoint(1, 20, 0, 0);
         pts->SetPoint(2, 20, 20, 0);
         pts->SetPoint(3, 25, 40, 0);
-        pts->SetPoint(4, 30, 50, 0);
+        pts->SetPoint(4, 0, 0, 0);
 
         VTK_NEW(vtkPolyLineWidget, lineWidget);
         lineWidget->SetInteractor(interactor);

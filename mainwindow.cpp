@@ -36,6 +36,10 @@
 #include <vtkProperty.h>
 #include <vtkCallbackCommand.h>
 #include <vtkImageProperty.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkTubeFilter.h>
+#include <vtkTransform.h>
+#include <vtkTransformPolyDataFilter.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -88,7 +92,7 @@ void MainWindow::on_actionOpenFile_triggered()
         VTK_NEW(vtkRenderWindowInteractor, interactor);
         interactor->SetRenderWindow(m_renderer->GetRenderWindow());
 
-        VTK_NEW(vtkInteractorStyleImage, style);
+        VTK_NEW(vtkInteractorStyleTrackballCamera, style);
         interactor->SetInteractorStyle(style);
 
         //m_renderer->AddActor(canvasImageActor);
@@ -197,7 +201,7 @@ void MainWindow::on_actionCreate_polyline_triggered()
     tracer->GetLineProperty()->SetLineWidth(2);
     tracer->SetInteractor(interactor);
     tracer->SetViewProp(m_mainActor);
-    tracer->SetProjectToPlane(1);
+    tracer->SetProjectToPlane(1); //place widget lines 1 unit in front of the main image plane
     tracer->SetProjectionNormalToZAxes();
     tracer->SetProjectionPosition(1);
     tracer->SetAutoClose(1);
@@ -224,80 +228,57 @@ void MainWindow::on_actionClear_polylines_triggered()
 
 void MainWindow::on_actionRasterize_polylines_triggered()
 {
-    VTK_NEW(vtkSphereSource, sphereSource);
-    sphereSource->SetRadius(20);
-    sphereSource->SetPhiResolution(30);
-    sphereSource->SetThetaResolution(30);
-    sphereSource->Update();
-    vtkSmartPointer<vtkPolyData> pd1 = sphereSource->GetOutput();
-
-    VTK_NEW(vtkLineSource, lineSource);
-    lineSource->SetPoint1(0, 0, 0);
-    lineSource->SetPoint2(100, 100, 0);
-    lineSource->Update();
-    vtkSmartPointer<vtkPolyData> pd2 = lineSource->GetOutput();
-
-    VTK_NEW(vtkLinearExtrusionFilter, linearFilterX);
-    linearFilterX->SetInputData(pd2);
-    linearFilterX->SetCapping(1);
-    linearFilterX->SetScaleFactor(1);
-    linearFilterX->SetExtrusionTypeToNormalExtrusion();
-    linearFilterX->SetVector(1, 0, 0);
-    linearFilterX->Update();
-
-    VTK_NEW(vtkLinearExtrusionFilter, linearFilterY);
-    linearFilterY->SetInputData(linearFilterX->GetOutput());
-    linearFilterY->SetCapping(1);
-    linearFilterY->SetScaleFactor(1);
-    linearFilterY->SetExtrusionTypeToNormalExtrusion();
-    linearFilterY->SetVector(0, 1, 1);
-    linearFilterY->Update();
-
-    VTK_NEW(vtkLinearExtrusionFilter, linearFilterZ);
-    linearFilterZ->SetInputData(linearFilterY->GetOutput());
-    linearFilterZ->SetCapping(1);
-    linearFilterZ->SetScaleFactor(1);
-    linearFilterZ->SetExtrusionTypeToNormalExtrusion();
-    linearFilterZ->SetVector(0, 0, 1);
-    linearFilterZ->Update();
-
-    vtkSmartPointer<vtkPolyData> pd3 = linearFilterZ->GetOutput();
-
     VTK_NEW(vtkAppendPolyData, appendFilter);
-    appendFilter->AddInputData(pd1);
-    appendFilter->AddInputData(pd3);
+    VTK_NEW(vtkPolyData, pd);
+    for(int i = 0; i < m_polylines.size(); i++)
+    {
+        vtkImageTracerWidget* widget = m_polylines[i];
+        widget->GetPath(pd);
+        appendFilter->AddInputData(pd);
+    }
     appendFilter->Update();
-    vtkSmartPointer<vtkPolyData> pd = appendFilter->GetOutput();
+
+    //Translate polydata down in the Z direction so it sits on top of the
+    //main image. Its usually 1 unit ahead of it so we can see it on top of the image
+    VTK_NEW(vtkTransform, trans);
+    trans->Translate(0, 0, -1);
+
+    VTK_NEW(vtkTransformPolyDataFilter, transFilter);
+    transFilter->SetInputData(appendFilter->GetOutput());
+    transFilter->SetTransform(trans);
+    transFilter->Update();
+
+    VTK_NEW(vtkTubeFilter, tube);
+    tube->SetInputData(transFilter->GetOutput());
+    tube->SetRadius(0.5);
+    tube->SetNumberOfSides(6);
+    tube->CappingOn();
+    tube->Update();
 
     VTK_NEW(vtkPolyDataMapper, mapper);
-    mapper->SetInputData(pd);
+    mapper->SetInputData(tube->GetOutput());
 
     VTK_NEW(vtkActor, polyActor);
     polyActor->SetMapper(mapper);
 
     VTK_NEW(vtkImageData, whiteImage);
-    double bounds[6];
-    pd->GetBounds(bounds);
-    double spacing[3]; // desired volume spacing
-    spacing[0] = 0.5;
-    spacing[1] = 0.5;
-    spacing[2] = 0.5;
-    whiteImage->SetSpacing(spacing);
-
-    // compute dimensions
+    double spacing[3];
     int dim[3];
-    for (int i = 0; i < 3; i++)
-    {
-        dim[i] = static_cast<int>(ceil((bounds[i * 2 + 1] - bounds[i * 2]) / spacing[i]));
-    }
-    whiteImage->SetDimensions(dim);
-    whiteImage->SetExtent(0, dim[0] - 1, 0, dim[1] - 1, 0, 0);
-
     double origin[3];
-    origin[0] = bounds[0] + spacing[0] / 2;
-    origin[1] = bounds[2] + spacing[1] / 2;
-    origin[2] = 0;
+    int extent[6];
+    auto mainImage = m_mainActor->GetInput();
+    mainImage->GetSpacing(spacing);
+    mainImage->GetDimensions(dim);
+    mainImage->GetOrigin(origin);
+    mainImage->GetExtent(extent);
+
+    spacing[2] = 0;
+    mainImage->SetSpacing(spacing);
+
+    whiteImage->SetDimensions(dim);
+    whiteImage->SetSpacing(spacing);
     whiteImage->SetOrigin(origin);
+    whiteImage->SetExtent(extent);
     whiteImage->AllocateScalars(VTK_UNSIGNED_CHAR,1);
 
     // fill the image with foreground voxels:
@@ -311,7 +292,7 @@ void MainWindow::on_actionRasterize_polylines_triggered()
 
     // polygonal data --> image stencil:
     VTK_NEW(vtkPolyDataToImageStencil, pol2stenc);
-    pol2stenc->SetInputData(pd);
+    pol2stenc->SetInputData(tube->GetOutput());
     pol2stenc->SetOutputOrigin(origin);
     pol2stenc->SetOutputSpacing(spacing);
     pol2stenc->SetOutputWholeExtent(whiteImage->GetExtent());
@@ -328,11 +309,14 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     VTK_NEW(vtkImageActor, imgActor);
     imgActor->SetInputData(imgstenc->GetOutput());
     imgActor->GetProperty()->SetInterpolationTypeToNearest();
+    imgActor->SetOpacity(0.5);
 
-    m_renderer->RemoveAllViewProps();
+    //m_renderer->RemoveAllViewProps();
     m_renderer->AddActor(imgActor);
     //m_renderer->AddActor(polyActor);
     m_renderer->ResetCamera();
 
     this->ui->qvtkWidget->repaint();
+
+    //on_actionClear_polylines_triggered();
 }

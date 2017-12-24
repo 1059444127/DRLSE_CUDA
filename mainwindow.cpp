@@ -92,7 +92,7 @@ void MainWindow::on_actionOpenFile_triggered()
         VTK_NEW(vtkRenderWindowInteractor, interactor);
         interactor->SetRenderWindow(m_renderer->GetRenderWindow());
 
-        VTK_NEW(vtkInteractorStyleTrackballCamera, style);
+        VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
 
         //m_renderer->AddActor(canvasImageActor);
@@ -250,7 +250,7 @@ void MainWindow::on_actionRasterize_polylines_triggered()
 
     VTK_NEW(vtkTubeFilter, tube);
     tube->SetInputData(transFilter->GetOutput());
-    tube->SetRadius(0.5);
+    tube->SetRadius(0.3);
     tube->SetNumberOfSides(6);
     tube->CappingOn();
     tube->Update();
@@ -271,9 +271,6 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     mainImage->GetDimensions(dim);
     mainImage->GetOrigin(origin);
     mainImage->GetExtent(extent);
-
-    spacing[2] = 0;
-    mainImage->SetSpacing(spacing);
 
     whiteImage->SetDimensions(dim);
     whiteImage->SetSpacing(spacing);
@@ -309,14 +306,18 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     VTK_NEW(vtkImageActor, imgActor);
     imgActor->SetInputData(imgstenc->GetOutput());
     imgActor->GetProperty()->SetInterpolationTypeToNearest();
+    imgActor->GetMapper()->BackgroundOff();
     imgActor->SetOpacity(0.5);
+
+    m_mainActor->GetInput()->Print(std::cout);
+    whiteImage->Print(std::cout);
 
     //m_renderer->RemoveAllViewProps();
     m_renderer->AddActor(imgActor);
     //m_renderer->AddActor(polyActor);
-    m_renderer->ResetCamera();
+    //m_renderer->ResetCamera();
 
     this->ui->qvtkWidget->repaint();
 
-    //on_actionClear_polylines_triggered();
+    on_actionClear_polylines_triggered();
 }

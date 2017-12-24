@@ -3,6 +3,7 @@
 
 #include <cuda_runtime.h>
 
-vtkSmartPointer<vtkImageData> runCuda(vtkImageData* input);
+vtkSmartPointer<vtkImageData> testCUDA(vtkImageData* input);
+vtkSmartPointer<vtkImageData> testCUDAandRasterized(vtkImageData* dicomImageData, vtkImageData* polyLineImageData);
 
 

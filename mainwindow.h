@@ -33,11 +33,14 @@ class MainWindow : public QMainWindow
     void on_actionCreate_polyline_triggered();
     void on_actionClear_polylines_triggered();
     void on_actionRasterize_polylines_triggered();
+    void on_actionTest_CUDA_rasterized_triggered();
 
 private:
     Ui::MainWindow *ui;
 
     vtkSmartPointer<vtkImageActor> m_mainActor;
     vtkSmartPointer<vtkRenderer> m_renderer;
+
     std::vector<vtkSmartPointer<vtkImageTracerWidget>> m_polylines;
+    vtkSmartPointer<vtkImageActor> m_polyLineActor;
 };

@@ -178,7 +178,7 @@ void MainWindow::on_actionTest_CUDA_triggered()
     auto inputData = m_mainActor->GetInput();
 
     //Apply our CUDA kernel to it
-    auto outputData = runCuda(inputData);
+    auto outputData = testCUDA(inputData);
 
     //Display results
     m_mainActor->GetMapper()->RemoveAllInputs();
@@ -303,21 +303,38 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     imgstenc->SetBackgroundValue(outval);
     imgstenc->Update();
 
-    VTK_NEW(vtkImageActor, imgActor);
-    imgActor->SetInputData(imgstenc->GetOutput());
-    imgActor->GetProperty()->SetInterpolationTypeToNearest();
-    imgActor->GetMapper()->BackgroundOff();
-    imgActor->SetOpacity(0.5);
+    m_polyLineActor = vtkSmartPointer<vtkImageActor>::New();
+    m_polyLineActor->SetInputData(imgstenc->GetOutput());
+    m_polyLineActor->GetProperty()->SetInterpolationTypeToNearest();
+    m_polyLineActor->GetMapper()->BackgroundOff();
+    m_polyLineActor->SetOpacity(0.5);
 
     m_mainActor->GetInput()->Print(std::cout);
     whiteImage->Print(std::cout);
 
     //m_renderer->RemoveAllViewProps();
-    m_renderer->AddActor(imgActor);
+    m_renderer->AddActor(m_polyLineActor);
     //m_renderer->AddActor(polyActor);
     //m_renderer->ResetCamera();
 
     this->ui->qvtkWidget->repaint();
 
     on_actionClear_polylines_triggered();
+}
+
+void MainWindow::on_actionTest_CUDA_rasterized_triggered()
+{
+    //Get currently displayed imageData
+    auto dicomImageData = m_mainActor->GetInput();
+
+    //Get rasterized polyline imageData
+    auto polyLineImageData = m_polyLineActor->GetInput();
+
+    //Apply our CUDA kernel to it
+    auto outputData = testCUDAandRasterized(dicomImageData, polyLineImageData);
+
+    //Display results
+    m_mainActor->GetMapper()->RemoveAllInputs();
+    m_mainActor->SetInputData(outputData);
+    this->ui->qvtkWidget->repaint();
 }

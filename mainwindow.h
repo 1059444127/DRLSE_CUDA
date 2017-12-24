@@ -6,6 +6,7 @@
 #include <vtkRenderer.h>
 #include <vtkImageActor.h>
 #include <vtkPolyLineWidget.h>
+#include <vtkImageTracerWidget.h>
 
 namespace Ui{
     class MainWindow;
@@ -38,5 +39,5 @@ private:
 
     vtkSmartPointer<vtkImageActor> m_mainActor;
     vtkSmartPointer<vtkRenderer> m_renderer;
-    std::vector<vtkPolyLineWidget*> m_polylines;
+    std::vector<vtkImageTracerWidget*> m_polylines;
 };

@@ -62,25 +62,6 @@ void MainWindow::ShowStatus(std::string message)
     this->statusBar()->showMessage(QString::fromStdString(message));
 }
 
-void CallbackFunction (vtkObject* caller,
-                       long unsigned int vtkNotUsed(eventId),
-                       void* vtkNotUsed(clientData),
-                       void* vtkNotUsed(callData) )
-{
-  vtkImageTracerWidget* tracerWidget =
-    static_cast<vtkImageTracerWidget*>(caller);
-
-  vtkSmartPointer<vtkPolyData> path =
-    vtkSmartPointer<vtkPolyData>::New();
-
-  tracerWidget->GetPath(path);
-  auto lines = path->GetLines();
-  auto pts = path->GetPoints();
-  lines->Modified();
-
-  std::cout << "There are " << path->GetNumberOfPoints() << " points in the path." << std::endl;
-}
-
 void MainWindow::on_actionOpenFile_triggered()
 {
     //getOpenFileName displays a file dialog and returns the full file path of the selected file, or an empty string if the user canceled the dialog
@@ -107,42 +88,6 @@ void MainWindow::on_actionOpenFile_triggered()
 
         VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
-
-        //Gets spatial info for our dicomImage
-        double spacing[3];
-        int dims[3];
-        int extents[6];
-        double origin[3];
-        dicomImage->GetSpacing(spacing);
-        dicomImage->GetExtent(extents);
-        dicomImage->GetOrigin(origin);
-        dicomImage->GetDimensions(dims);
-
-        std::cout << origin[0] << ", " << origin[1] << ", " << origin[2] << std::endl;
-
-        VTK_NEW(vtkImageCanvasSource2D, imageSource);
-        imageSource->SetScalarTypeToUnsignedChar();
-        imageSource->SetNumberOfScalarComponents(3);
-        imageSource->SetExtent(extents);
-        imageSource->SetDrawColor(255,0,0);
-        imageSource->Update();
-
-        VTK_NEW(vtkImageActor, canvasImageActor);
-        canvasImageActor->GetMapper()->SetInputConnection(imageSource->GetOutputPort());
-
-        VTK_NEW(vtkCallbackCommand, callback);
-        callback->SetCallback(CallbackFunction);
-
-        VTK_NEW(vtkImageTracerWidget, tracer);
-        tracer->GetLineProperty()->SetLineWidth(2);
-        tracer->SetInteractor(interactor);
-        tracer->SetViewProp(m_mainActor);
-        tracer->AddObserver(vtkCommand::EndInteractionEvent, callback);
-        tracer->SetProjectToPlane(1);
-        tracer->SetProjectionNormalToZAxes();
-        tracer->SetProjectionPosition(1);
-        tracer->SetAutoClose(1);
-        tracer->On();
 
         //m_renderer->AddActor(canvasImageActor);
         m_renderer->AddActor(m_mainActor);
@@ -237,26 +182,27 @@ void MainWindow::on_actionTest_CUDA_triggered()
 
 void MainWindow::on_actionCreate_polyline_triggered()
 {
+    //Stop manipulating other polylines
+    for(int i = 0; i < m_polylines.size(); i++)
+    {
+        vtkImageTracerWidget* widget = m_polylines[i];
+        widget->InteractionOff();
+    }
+
     auto interactor = m_renderer->GetRenderWindow()->GetInteractor();
 
-    VTK_NEW(vtkPoints, pts);
-    pts->SetNumberOfPoints(5);
-    pts->SetPoint(0, 0, 0, 0);
-    pts->SetPoint(1, 20, 0, 0);
-    pts->SetPoint(2, 20, 20, 0);
-    pts->SetPoint(3, 25, 40, 0);
-    pts->SetPoint(4, 0, 0, 0);
+    VTK_NEW(vtkImageTracerWidget, tracer);
+    tracer->GetLineProperty()->SetLineWidth(2);
+    tracer->SetInteractor(interactor);
+    tracer->SetViewProp(m_mainActor);
+    tracer->SetProjectToPlane(1);
+    tracer->SetProjectionNormalToZAxes();
+    tracer->SetProjectionPosition(1);
+    tracer->SetAutoClose(1);
+    tracer->On();
 
-    VTK_NEW(vtkPolyLineWidget, polyLineWidget);
-    polyLineWidget->SetInteractor(interactor);
-    polyLineWidget->On();
-
-    //Keep track of this polylinewidget (easiest way of cleaning it later)
-    m_polylines.push_back(polyLineWidget.GetPointer());
-
-    //Get a polylinerepresentation out of our polylinewidget
-    auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(polyLineWidget->GetRepresentation());
-    polyLineRep->InitializeHandles(pts);
+    //Keep track of this polyline (easiest way of cleaning it later)
+    m_polylines.push_back(tracer.GetPointer());
 
     this->ui->qvtkWidget->repaint();
     interactor->Start();
@@ -266,7 +212,8 @@ void MainWindow::on_actionClear_polylines_triggered()
 {
     for(int i = 0; i < m_polylines.size(); i++)
     {
-        vtkPolyLineWidget* widget = m_polylines[i];
+        vtkImageTracerWidget* widget = m_polylines[i];
+        widget->Off();
         widget->Delete();
     }
     m_polylines.clear();

@@ -39,5 +39,5 @@ private:
 
     vtkSmartPointer<vtkImageActor> m_mainActor;
     vtkSmartPointer<vtkRenderer> m_renderer;
-    std::vector<vtkImageTracerWidget*> m_polylines;
+    std::vector<vtkSmartPointer<vtkImageTracerWidget>> m_polylines;
 };

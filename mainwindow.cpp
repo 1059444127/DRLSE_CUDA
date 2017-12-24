@@ -208,7 +208,7 @@ void MainWindow::on_actionCreate_polyline_triggered()
     tracer->On();
 
     //Keep track of this polyline (easiest way of cleaning it later)
-    m_polylines.push_back(tracer.GetPointer());
+    m_polylines.push_back(tracer);
 
     this->ui->qvtkWidget->repaint();
     interactor->Start();
@@ -218,9 +218,8 @@ void MainWindow::on_actionClear_polylines_triggered()
 {
     for(int i = 0; i < m_polylines.size(); i++)
     {
-        vtkImageTracerWidget* widget = m_polylines[i];
+        auto widget = m_polylines[i];
         widget->Off();
-        widget->Delete();
     }
     m_polylines.clear();
     this->ui->qvtkWidget->repaint();
@@ -229,10 +228,11 @@ void MainWindow::on_actionClear_polylines_triggered()
 void MainWindow::on_actionRasterize_polylines_triggered()
 {
     VTK_NEW(vtkAppendPolyData, appendFilter);
-    VTK_NEW(vtkPolyData, pd);
     for(int i = 0; i < m_polylines.size(); i++)
     {
-        vtkImageTracerWidget* widget = m_polylines[i];
+        auto widget = m_polylines[i];
+
+        VTK_NEW(vtkPolyData, pd);
         widget->GetPath(pd);
         appendFilter->AddInputData(pd);
     }

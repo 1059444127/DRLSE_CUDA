@@ -22,6 +22,18 @@
 #include <vtkPoints.h>
 #include <vtkPropCollection.h>
 #include <vtkProp.h>
+#include <vtkPolyDataToImageStencil.h>
+#include <vtkImageStencil.h>
+#include <vtkPointData.h>
+#include <vtkLinearExtrusionFilter.h>
+#include <vtkAppendPolyData.h>
+#include <vtkCleanPolyData.h>
+#include <vtkSphereSource.h>
+
+#include <vtkImageTracerWidget.h>
+#include <vtkImageCanvasSource2D.h>
+#include <vtkProperty.h>
+#include <vtkCallbackCommand.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -182,17 +194,34 @@ void MainWindow::on_actionCreate_polyline_triggered()
     pts->SetPoint(3, 25, 40, 0);
     pts->SetPoint(4, 0, 0, 0);
 
-    VTK_NEW(vtkPolyLineWidget, lineWidget);
-    lineWidget->SetInteractor(interactor);
-    lineWidget->On();
+    VTK_NEW(vtkPolyLineWidget, polyLineWidget);
+    polyLineWidget->SetInteractor(interactor);
+    polyLineWidget->On();
 
-    m_polylines.push_back(lineWidget.GetPointer());
+    //Keep track of this polylinewidget (easiest way of cleaning it later)
+    m_polylines.push_back(polyLineWidget.GetPointer());
 
-    auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(lineWidget->GetRepresentation());
+    //Get a polylinerepresentation out of our polylinewidget
+    auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(polyLineWidget->GetRepresentation());
     polyLineRep->InitializeHandles(pts);
 
     this->ui->qvtkWidget->repaint();
     interactor->Start();
+}
+
+void CallbackFunction (vtkObject* caller,
+                       long unsigned int vtkNotUsed(eventId),
+                       void* vtkNotUsed(clientData),
+                       void* vtkNotUsed(callData) )
+{
+  vtkImageTracerWidget* tracerWidget =
+    static_cast<vtkImageTracerWidget*>(caller);
+
+  vtkSmartPointer<vtkPolyData> path =
+    vtkSmartPointer<vtkPolyData>::New();
+
+  tracerWidget->GetPath(path);
+  std::cout << "There are " << path->GetNumberOfPoints() << " points in the path." << std::endl;
 }
 
 void MainWindow::on_actionClear_polylines_triggered()
@@ -203,5 +232,160 @@ void MainWindow::on_actionClear_polylines_triggered()
         widget->Delete();
     }
     m_polylines.clear();
+    this->ui->qvtkWidget->repaint();
+
+
+    vtkSmartPointer<vtkImageCanvasSource2D> imageSource =
+        vtkSmartPointer<vtkImageCanvasSource2D>::New();
+      imageSource->SetScalarTypeToUnsignedChar();
+      imageSource->SetNumberOfScalarComponents(3);
+      imageSource->SetExtent(0, 20, 0, 50, 0, 0);
+      imageSource->SetDrawColor(0,0,0);
+      imageSource->FillBox(0,20,0,50);
+      imageSource->SetDrawColor(255,0,0);
+      imageSource->FillBox(0,10,0,30);
+      imageSource->Update();
+
+      vtkSmartPointer<vtkImageActor> actor =
+        vtkSmartPointer<vtkImageActor>::New();
+      actor->GetMapper()->SetInputConnection(imageSource->GetOutputPort());
+
+      vtkSmartPointer<vtkRenderer> renderer =
+        vtkSmartPointer<vtkRenderer>::New();
+      renderer->AddActor(actor);
+      renderer->ResetCamera();
+      vtkSmartPointer<vtkRenderWindow> renderWindow =
+        vtkSmartPointer<vtkRenderWindow>::New();
+      renderWindow->AddRenderer(renderer);
+      vtkSmartPointer<vtkRenderWindowInteractor> interactor =
+        vtkSmartPointer<vtkRenderWindowInteractor>::New();
+      interactor->SetRenderWindow(renderWindow);
+
+      vtkSmartPointer<vtkInteractorStyleImage> style =
+        vtkSmartPointer<vtkInteractorStyleImage>::New();
+      interactor->SetInteractorStyle(style);
+
+      vtkSmartPointer<vtkImageTracerWidget> tracer =
+        vtkSmartPointer<vtkImageTracerWidget>::New();
+      tracer->GetLineProperty()->SetLineWidth(5);
+      tracer->SetInteractor(interactor);
+      tracer->SetViewProp(actor);
+      renderWindow->Render();
+
+      // The observer must be added BEFORE the On() call.
+      vtkSmartPointer<vtkCallbackCommand> callback =
+        vtkSmartPointer<vtkCallbackCommand>::New();
+      callback->SetCallback(CallbackFunction);
+      tracer->AddObserver(vtkCommand::EndInteractionEvent, callback);
+
+      tracer->On();
+      interactor->Start();
+
+
+
+
+
+
+
+
+
+}
+
+void MainWindow::on_actionRasterize_polylines_triggered()
+{
+    //Append all polyDatas
+    VTK_NEW(vtkPolyData, polydata);
+    VTK_NEW(vtkAppendPolyData, appendFilter);
+    for(int i = 0; i < m_polylines.size(); i++)
+    {
+        vtkPolyLineWidget* widget = m_polylines[i];
+
+        auto polyLineRep = reinterpret_cast<vtkPolyLineRepresentation*>(widget->GetRepresentation());
+        polyLineRep->GetPolyData(polydata);
+        appendFilter->AddInputData(polydata);
+    }
+
+    VTK_NEW(vtkSphereSource, ss);
+    ss->SetRadius(20);
+    ss->SetPhiResolution(30);
+    ss->SetThetaResolution(30);
+    ss->SetCenter(100, 100, 0);
+    auto pd = ss->GetOutput();
+    ss->Update();
+
+    appendFilter->AddInputData(pd);
+    appendFilter->Update();
+
+    //Record spatial properties of the main image
+    double spacing[3];
+    int dims[3];
+    int extents[6];
+    double origin[3];
+    auto mainImage = m_mainActor->GetInput();
+    mainImage->GetSpacing(spacing);
+    mainImage->GetDimensions(dims);
+    mainImage->GetExtent(extents);
+    mainImage->GetOrigin(origin);
+
+    //Create a rasterized image directly on top of the main image
+    VTK_NEW(vtkImageData, rasterImageData);
+    rasterImageData->SetExtent(extents);
+    rasterImageData->SetSpacing(spacing);
+    rasterImageData->SetDimensions(dims);
+    rasterImageData->SetOrigin(origin);
+    rasterImageData->AllocateScalars(VTK_UNSIGNED_CHAR, 1);
+
+    // fill the image with foreground voxels:
+    unsigned char inval = 255;
+    unsigned char outval = 0;
+    vtkIdType count = rasterImageData->GetNumberOfPoints();
+    for (vtkIdType i = 0; i < count; ++i)
+    {
+        rasterImageData->GetPointData()->GetScalars()->SetTuple1(i, inval);
+    }
+
+    VTK_NEW(vtkCleanPolyData, cleanFilter);
+    cleanFilter->SetInputData(appendFilter->GetOutput());
+    cleanFilter->Update();
+
+//    VTK_NEW(vtkLinearExtrusionFilter, extrusionFilter);
+//    extrusionFilter->SetInputData(cleanFilter->GetOutput());
+//    extrusionFilter->SetScaleFactor(1);
+//    extrusionFilter->SetExtrusionTypeToNormalExtrusion();
+//    extrusionFilter->SetVector(0, 0, 1);
+//    extrusionFilter->Update();
+
+    VTK_NEW(vtkPolyDataToImageStencil, stencilFilter);
+//    stencilFilter->SetTolerance(0);
+    stencilFilter->SetInputData(pd);
+    stencilFilter->SetOutputOrigin(origin);
+    stencilFilter->SetOutputSpacing(spacing);
+    stencilFilter->SetOutputWholeExtent(extents);
+    stencilFilter->Update();
+
+    VTK_NEW(vtkImageStencil, imgStencil);
+    imgStencil->SetInputData(rasterImageData);
+    imgStencil->SetStencilData(stencilFilter->GetOutput());
+    imgStencil->ReverseStencilOff();
+    imgStencil->SetBackgroundValue(outval);
+    imgStencil->Update();
+
+    VTK_NEW(vtkPolyDataMapper, mapper);
+    mapper->SetInputData(pd);
+    mapper->Update();
+
+    VTK_NEW(vtkActor, sphereActor);
+    sphereActor->SetMapper(mapper);
+
+    VTK_NEW(vtkImageActor, newImgActor);
+    newImgActor->SetInputData(rasterImageData);
+    newImgActor->Update();
+
+    //m_renderer->RemoveActor(m_mainActor);
+    m_renderer->AddActor(sphereActor);
+    //m_renderer->AddActor(newImgActor);
+    m_renderer->ResetCamera();
+    m_renderer->Render();
+
     this->ui->qvtkWidget->repaint();
 }

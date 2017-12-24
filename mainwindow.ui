@@ -83,8 +83,11 @@
      <string>Tools</string>
     </property>
     <addaction name="actionTest_CUDA"/>
+    <addaction name="separator"/>
     <addaction name="actionCreate_polyline"/>
     <addaction name="actionClear_polylines"/>
+    <addaction name="separator"/>
+    <addaction name="actionRasterize_polylines"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
@@ -142,6 +145,11 @@
   <action name="actionClear_polylines">
    <property name="text">
     <string>Clear polylines</string>
+   </property>
+  </action>
+  <action name="actionRasterize_polylines">
+   <property name="text">
+    <string>Rasterize polylines</string>
    </property>
   </action>
  </widget>

@@ -11,11 +11,7 @@
 #include <cuda_runtime.h>
 
 #include <cudadriver.h>
-
-extern short* modifyTexture(int imageWidth, int imageHeight, short* textureData);
-extern unsigned short* modifyTexture(int imageWidth, int imageHeight, unsigned short* textureData);
-extern short* modifyTextureRasterized(int imageWidth, int imageHeight, short* dicomData, unsigned char* polylineData);
-extern unsigned short* modifyTextureRasterized(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);
+#include <kernels.cuh>
 
 //Makes these long declarations a little more readable
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
@@ -29,7 +25,11 @@ vtkSmartPointer<vtkImageData> testCUDA(vtkImageData* input)
     if(type == "short")
     {
         short* inputScalarPointer = static_cast<short*>(input->GetScalarPointer());
-        short* outputScalarPointer = modifyTexture(inputDims[0], inputDims[1], inputScalarPointer);
+        short* outputScalarPointer =
+                modifyTexture<short, cudaChannelFormatKindSigned>(
+                    inputDims[0],
+                    inputDims[1],
+                    inputScalarPointer);
 
         VTK_NEW(vtkShortArray, outputArr);
         outputArr->SetNumberOfComponents(1);
@@ -43,7 +43,11 @@ vtkSmartPointer<vtkImageData> testCUDA(vtkImageData* input)
     else if(type == "unsigned short")
     {
         unsigned short* inputScalarPointer = static_cast<unsigned short*>(input->GetScalarPointer());
-        unsigned short* outputScalarPointer = modifyTexture(inputDims[0], inputDims[1], inputScalarPointer);
+        unsigned short* outputScalarPointer =
+                modifyTexture<unsigned short, cudaChannelFormatKindUnsigned>(
+                    inputDims[0],
+                    inputDims[1],
+                    inputScalarPointer);
 
         VTK_NEW(vtkUnsignedShortArray, outputArr);
         outputArr->SetNumberOfComponents(1);
@@ -82,7 +86,12 @@ vtkSmartPointer<vtkImageData> testCUDAandRasterized(vtkImageData* dicomImageData
     if(type == "short")
     {
         short* dicomScalarPointer = static_cast<short*>(dicomImageData->GetScalarPointer());
-        short* outputScalarPointer = modifyTextureRasterized(inputDims[0], inputDims[1], dicomScalarPointer, polyLineScalarPointer);
+        short* outputScalarPointer =
+                modifyTextureRasterized<short, cudaChannelFormatKindSigned>(
+                    inputDims[0],
+                    inputDims[1],
+                    dicomScalarPointer,
+                    polyLineScalarPointer);
 
         VTK_NEW(vtkShortArray, outputArr);
         outputArr->SetNumberOfComponents(1);
@@ -96,7 +105,12 @@ vtkSmartPointer<vtkImageData> testCUDAandRasterized(vtkImageData* dicomImageData
     else if(type == "unsigned short")
     {
         unsigned short* dicomScalarPointer = static_cast<unsigned short*>(dicomImageData->GetScalarPointer());
-        unsigned short* outputScalarPointer = modifyTextureRasterized(inputDims[0], inputDims[1], dicomScalarPointer, polyLineScalarPointer);
+        unsigned short* outputScalarPointer =
+                modifyTextureRasterized<unsigned short, cudaChannelFormatKindUnsigned>(
+                    inputDims[0],
+                    inputDims[1],
+                    dicomScalarPointer,
+                    polyLineScalarPointer);
 
         VTK_NEW(vtkUnsignedShortArray, outputArr);
         outputArr->SetNumberOfComponents(1);

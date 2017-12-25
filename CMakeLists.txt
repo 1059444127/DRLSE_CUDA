@@ -22,13 +22,17 @@ set(SOURCES
     cudadriver.cpp
     )
 
-set(KERNELS
-    kernelOnly.cu
-    )
-
 set(HEADERS
     mainwindow.h
     cudadriver.h
+    )
+
+set(KERNELS_SOURCES
+    kernels.cu
+    )
+
+set(KERNELS_HEADERS
+    kernels.cuh
     )
 
 set(UI
@@ -50,13 +54,13 @@ include_directories (${PROJECT_BINARY_DIR})
 
 # Compile our CUDA kernel library
 list(APPEND CUDA_NVCC_FLAGS -gencode=arch=compute_61,code=sm_61)
-add_library(CudaLib STATIC ${KERNELS})
+add_library(CudaLib STATIC ${KERNELS_SOURCES} ${KERNELS_HEADERS})
 target_compile_features(CudaLib PUBLIC cxx_std_11)
 set_target_properties(CudaLib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(CudaLib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 # Compile Qt+VTK+Cpp into an executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS_MOC} ${UI_MOC} ${RESOURCES_RCC})
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS_MOC} ${UI_MOC} ${RESOURCES_RCC} ${KERNELS_HEADERS})
 set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link libraries to the executable

@@ -17,7 +17,18 @@ namespace cg = cooperative_groups;
 #define COLUMNS_RESULT_STEPS 8 //Number of pixels each work item processes vertically
 #define COLUMNS_HALO_STEPS 1
 
-__constant__ float convKernel[KERNEL_RADIUS];
+__constant__ float d_gaussKernel3[3*3];
+__constant__ float d_gaussKernel5[5*5] = {0.003765, 0.015019, 0.023792, 0.015019, 0.003765,
+                                          0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
+                                          0.023792, 0.094907, 0.150342, 0.094907, 0.023792,
+                                          0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
+                                          0.003765, 0.015019, 0.023792, 0.015019, 0.003765};
+
+//__constant__ float d_sobelX[5*5] = {2,   1,   0,   -1,  -2,
+//                                    3,   2,   0,   -2,  -3,
+//                                    4,   3,   0,   -3,  -4,
+//                                    3,   2,   0,   -2,  -3,
+//                                    2,   1,   0,   -1,  -2};
 
 //====================================================================================
 //ERROR CHECKING MACRO
@@ -80,15 +91,49 @@ __global__ void rasterizerTestSurface(cudaSurfaceObject_t input, cudaSurfaceObje
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (x < width && y < height)
+    if (x > 1 && x < width-2 && y > 1 && y < height-2)
     {
-        short data;
-        // Read from input surface
-        surf2Dread(&data,  input, x * sizeof(data), y);
-        // Write to output surface
-        surf2Dwrite((short)(32000 * (float)y/600.0f), output, x * sizeof(data), y);
+        int sum = 0;
+        short sample;
+        for(int i = -2; i <= 2; i++)
+        {
+            for(int j = -2; j <= 2; j++)
+            {
+                surf2Dread(&sample, input, (int)((x+i)*sizeof(sample)), (int)(y+j));
+                sum += sample * d_gaussKernel5[5*i+j];
+            }
+        }
+
+        surf2Dwrite((short)sum, output, x * sizeof(sample), y);
     }
 }
+
+template<typename T>
+__global__ void convolutionTest(cudaSurfaceObject_t input, cudaSurfaceObject_t output, int width, int height)
+{
+    // Calculate surface coordinates
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x > 1 && x < width-2 && y > 1 && y < height-2)
+    {
+        int sum = 0;
+        T sample;
+        for(int i = -2; i <= 2; i++)
+        {
+            for(int j = -2; j <= 2; j++)
+            {
+                surf2Dread(&sample, input, (int)((x+i)*sizeof(sample)), (int)(y+j), cudaBoundaryModeClamp);
+                sum += sample * d_gaussKernel5[5*i+j];
+            }
+        }
+
+        add some error checking calls and remove the boundary check above. Also, is there boundarymode for the write?
+
+        surf2Dwrite((T)sum, output, x * sizeof(sample), y);
+    }
+}
+
 
 //====================================================================================
 //HOST CUDA FUNCTIONS
@@ -221,6 +266,57 @@ __host__ T* modifyTextureRasterized(int imageWidth, int imageHeight, T* dicomDat
 }
 
 template<typename T, cudaChannelFormatKind FK>
+__host__ T* convolveImage(int imageWidth, int imageHeight, T* h_dataDicom)
+{
+    size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
+
+    // Create a Surface with our image data and copy that data to the device
+    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(T), 0, 0, 0, FK);
+    cudaArray* d_arrayDicom;
+    cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight);
+    cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice);
+
+    cudaResourceDesc resDescDicom;
+    memset(&resDescDicom, 0, sizeof(resDescDicom));
+    resDescDicom.resType = cudaResourceTypeArray;
+    resDescDicom.res.array.array = d_arrayDicom;
+
+    cudaSurfaceObject_t d_surfDicom = 0;
+    cudaCreateSurfaceObject(&d_surfDicom, &resDescDicom);
+
+
+    // Create an output surface
+    cudaArray* d_arrayResult;
+    cudaMallocArray(&d_arrayResult, &channelFormatDicom, imageWidth, imageHeight);
+
+    cudaResourceDesc resDescResult;
+    memset(&resDescResult, 0, sizeof(resDescResult));
+    resDescResult.resType = cudaResourceTypeArray;
+    resDescResult.res.array.array = d_arrayResult;
+
+    cudaSurfaceObject_t d_surfResult = 0;
+    cudaCreateSurfaceObject(&d_surfResult, &resDescResult);
+
+
+    // Run kernel
+    dim3 block(imageWidth / 16, imageHeight / 16,1);
+    dim3 grid(16,16,1);
+    convolutionTest<T> <<<grid, block>>>(d_surfDicom, d_surfResult, imageWidth, imageHeight);
+
+    // Copy results to host
+    T* outputHost = (T*)malloc(sizeDicom);
+    cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost);
+
+    // Cleanup
+    cudaDestroySurfaceObject(d_surfDicom);
+    cudaDestroySurfaceObject(d_surfResult);
+    cudaFreeArray(d_arrayDicom);
+    cudaFreeArray(d_arrayResult);
+
+    return outputHost;
+}
+
+template<typename T, cudaChannelFormatKind FK>
 __host__ T* modifySurfaceRasterized(int imageWidth, int imageHeight, T* h_dataDicom, unsigned char* h_dataPolyline)
 {
     size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
@@ -301,3 +397,5 @@ template __host__ short* modifyTextureRasterized<short, cudaChannelFormatKindSig
 template __host__ unsigned short* modifyTextureRasterized<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);
 template __host__ short* modifySurfaceRasterized<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* dicomData, unsigned char* polylineData);
 template __host__ unsigned short* modifySurfaceRasterized<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);
+template __host__ short* convolveImage<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* textureData);
+template __host__ unsigned short* convolveImage<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* textureData);

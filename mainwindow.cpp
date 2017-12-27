@@ -365,3 +365,18 @@ void MainWindow::on_actionTest_CUDA_rasterized_triggered()
     m_renderer->AddActor(m_mainActor);
     this->ui->qvtkWidget->repaint();
 }
+
+void MainWindow::on_actionTest_convolution_triggered()
+{
+    //Get currently displayed imageData
+    auto dicomImageData = m_mainActor->GetInput();
+
+    //Apply our CUDA kernel to it
+    auto outputData = testConvolution(dicomImageData);
+
+    //Display results
+    m_mainActor->GetMapper()->RemoveAllInputs();
+    m_mainActor->SetInputData(outputData);
+
+    this->ui->qvtkWidget->repaint();
+}

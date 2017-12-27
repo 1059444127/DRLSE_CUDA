@@ -37,6 +37,7 @@ class MainWindow : public QMainWindow
     void on_actionClear_polylines_triggered();
     void on_actionRasterize_polylines_triggered();
     void on_actionTest_CUDA_rasterized_triggered();
+    void on_actionTest_convolution_triggered();
 
 private:
     Ui::MainWindow *ui;

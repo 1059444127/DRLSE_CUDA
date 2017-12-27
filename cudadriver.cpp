@@ -87,7 +87,7 @@ vtkSmartPointer<vtkImageData> testCUDAandRasterized(vtkImageData* dicomImageData
     {
         short* dicomScalarPointer = static_cast<short*>(dicomImageData->GetScalarPointer());
         short* outputScalarPointer =
-                modifyTextureRasterized<short, cudaChannelFormatKindSigned>(
+                modifySurfaceRasterized<short, cudaChannelFormatKindSigned>(
                     inputDims[0],
                     inputDims[1],
                     dicomScalarPointer,
@@ -106,7 +106,7 @@ vtkSmartPointer<vtkImageData> testCUDAandRasterized(vtkImageData* dicomImageData
     {
         unsigned short* dicomScalarPointer = static_cast<unsigned short*>(dicomImageData->GetScalarPointer());
         unsigned short* outputScalarPointer =
-                modifyTextureRasterized<unsigned short, cudaChannelFormatKindUnsigned>(
+                modifySurfaceRasterized<unsigned short, cudaChannelFormatKindUnsigned>(
                     inputDims[0],
                     inputDims[1],
                     dicomScalarPointer,

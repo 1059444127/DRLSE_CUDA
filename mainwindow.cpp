@@ -48,6 +48,8 @@
 //Makes these long declarations a little more readable
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
 
+MainWindow* MainWindow::instance;
+
 MainWindow::MainWindow()
 {
     //Configure the ui
@@ -61,11 +63,29 @@ MainWindow::MainWindow()
     //Add the renderer to the render window Qt widget
     m_renderer = vtkSmartPointer<vtkRenderer>::New();
     this->ui->qvtkWidget->GetRenderWindow()->AddRenderer(m_renderer);
+
+    if(MainWindow::instance == nullptr)
+    {
+        MainWindow::instance = this;
+    }
 }
 
 void MainWindow::ShowStatus(std::string message)
 {
     this->statusBar()->showMessage(QString::fromStdString(message));
+}
+
+void CallbackFunction (vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
+{
+    vtkInteractorStyleImage* style = static_cast<vtkInteractorStyleImage*>(caller);
+
+    int w[2];
+    style->GetWindowLevelStartPosition(w);
+
+    int windowWidth = w[0];
+    int windowLevel = w[1];
+
+    MainWindow::instance->ShowStatus("WW: " + std::to_string(windowWidth) + ", WC: " + std::to_string(windowLevel));
 }
 
 void MainWindow::on_actionOpenFile_triggered()
@@ -89,11 +109,15 @@ void MainWindow::on_actionOpenFile_triggered()
         m_mainActor->GetMapper()->SetInputData(dicomImage);
         //m_mainActor->SetOpacity(0.5);
 
+        VTK_NEW(vtkCallbackCommand, callback);
+        callback->SetCallback(CallbackFunction);
+
         VTK_NEW(vtkRenderWindowInteractor, interactor);
         interactor->SetRenderWindow(m_renderer->GetRenderWindow());
 
         VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
+        //style->AddObserver(vtkCommand::InteractionEvent, callback);
 
         //m_renderer->AddActor(canvasImageActor);
         m_renderer->AddActor(m_mainActor);
@@ -336,5 +360,8 @@ void MainWindow::on_actionTest_CUDA_rasterized_triggered()
     //Display results
     m_mainActor->GetMapper()->RemoveAllInputs();
     m_mainActor->SetInputData(outputData);
+
+    m_renderer->RemoveAllViewProps();
+    m_renderer->AddActor(m_mainActor);
     this->ui->qvtkWidget->repaint();
 }

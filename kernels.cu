@@ -1,8 +1,40 @@
 #include <device_launch_parameters.h>
 #include <cuda_runtime.h>
+#include <cooperative_groups.h>
+#include <stdio.h>
 
 #include <kernels.cuh>
 
+namespace cg = cooperative_groups;
+
+#define KERNEL_RADIUS 1
+#define ROWS_BLOCKDIM_X 32 //Width of a sub-segment
+#define ROWS_BLOCKDIM_Y 4 //Height of a sub-segment (and shared block)
+#define ROWS_RESULT_STEPS 8 //Number of pixels each work item processes horizontally
+#define ROWS_HALO_STEPS 1 //Number of pixels each work item processes on each halo
+#define COLUMNS_BLOCKDIM_X 32 //At least 32 so that we can get one row per transaction
+#define COLUMNS_BLOCKDIM_Y 16
+#define COLUMNS_RESULT_STEPS 8 //Number of pixels each work item processes vertically
+#define COLUMNS_HALO_STEPS 1
+
+__constant__ float convKernel[KERNEL_RADIUS];
+
+//====================================================================================
+//ERROR CHECKING MACRO
+//====================================================================================
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess)
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+//====================================================================================
+//KERNELS
+//====================================================================================
 template<typename T>
 __global__ void simpleKernel(T* output, cudaTextureObject_t input, int width, int height)
 {
@@ -42,6 +74,25 @@ __global__ void rasterizerTest(T* output, cudaTextureObject_t dicomTex, cudaText
     output[y * width + x] = dicomSample * (1 - sum);
 }
 
+__global__ void rasterizerTestSurface(cudaSurfaceObject_t input, cudaSurfaceObject_t output, cudaSurfaceObject_t polyline, int width, int height)
+{
+    // Calculate surface coordinates
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x < width && y < height)
+    {
+        short data;
+        // Read from input surface
+        surf2Dread(&data,  input, x * sizeof(data), y);
+        // Write to output surface
+        surf2Dwrite((short)(32000 * (float)y/600.0f), output, x * sizeof(data), y);
+    }
+}
+
+//====================================================================================
+//HOST CUDA FUNCTIONS
+//====================================================================================
 template<typename T, cudaChannelFormatKind FK>
 __host__ T* modifyTexture(int imageWidth, int imageHeight, T* textureData)
 {
@@ -169,8 +220,84 @@ __host__ T* modifyTextureRasterized(int imageWidth, int imageHeight, T* dicomDat
     return outputHost;
 }
 
+template<typename T, cudaChannelFormatKind FK>
+__host__ T* modifySurfaceRasterized(int imageWidth, int imageHeight, T* h_dataDicom, unsigned char* h_dataPolyline)
+{
+    size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
+    size_t sizePolyline = imageWidth * imageHeight * sizeof(unsigned char);
+
+    // Create a Surface with our image data and copy that data to the device
+    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(T), 0, 0, 0, FK);
+    cudaArray* d_arrayDicom;
+    cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight);
+    cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice);
+
+    cudaResourceDesc resDescDicom;
+    memset(&resDescDicom, 0, sizeof(resDescDicom));
+    resDescDicom.resType = cudaResourceTypeArray;
+    resDescDicom.res.array.array = d_arrayDicom;
+
+    cudaSurfaceObject_t d_surfDicom = 0;
+    cudaCreateSurfaceObject(&d_surfDicom, &resDescDicom);
+
+
+    // Create a surface with our polyline data and copy that data to the device
+    cudaChannelFormatDesc channelFormatPolyline = cudaCreateChannelDesc(8 * 1, 0, 0, 0, cudaChannelFormatKindUnsigned);
+    cudaArray* d_arrayPolyline;
+    cudaMallocArray(&d_arrayPolyline, &channelFormatPolyline, imageWidth, imageHeight);
+    cudaMemcpyToArray(d_arrayPolyline, 0, 0, h_dataPolyline, sizePolyline, cudaMemcpyHostToDevice);
+
+    cudaResourceDesc resDescPolyline;
+    memset(&resDescPolyline, 0, sizeof(resDescPolyline));
+    resDescPolyline.resType = cudaResourceTypeArray;
+    resDescPolyline.res.array.array = d_arrayPolyline;
+
+    cudaSurfaceObject_t d_surfPolyline = 0;
+    cudaCreateSurfaceObject(&d_surfPolyline, &resDescPolyline);
+
+
+    // Create an output surface
+    cudaArray* d_arrayResult;
+    cudaMallocArray(&d_arrayResult, &channelFormatDicom, imageWidth, imageHeight);
+
+    cudaResourceDesc resDescResult;
+    memset(&resDescResult, 0, sizeof(resDescResult));
+    resDescResult.resType = cudaResourceTypeArray;
+    resDescResult.res.array.array = d_arrayResult;
+
+    cudaSurfaceObject_t d_surfResult = 0;
+    cudaCreateSurfaceObject(&d_surfResult, &resDescResult);
+
+
+    // Run kernel
+    dim3 block(imageWidth / 16, imageHeight / 16,1);
+    dim3 grid(16,16,1);
+    rasterizerTestSurface<<<grid, block>>>(d_surfDicom, d_surfResult, d_surfPolyline, imageWidth, imageHeight);
+
+    // Copy results to host
+    T* outputHost = (T*)malloc(sizeDicom);
+    cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost);
+
+    // Cleanup
+    cudaDestroySurfaceObject(d_surfDicom);
+    cudaDestroySurfaceObject(d_surfPolyline);
+    cudaDestroySurfaceObject(d_surfResult);
+    cudaFreeArray(d_arrayDicom);
+    cudaFreeArray(d_arrayPolyline);
+    cudaFreeArray(d_arrayResult);
+
+    return outputHost;
+}
+
+//====================================================================================
+//TEMPLATE EXPLICIT INSTANTIATIONS
+//====================================================================================
 //Explicit instantiation so these signatures are available when the linker is linking our lib to the exe
+//The compiler would have no way of knowing these specific signatures will be needed since the calls are in
+//another compilation unit
 template __host__ short* modifyTexture<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* textureData);
 template __host__ unsigned short* modifyTexture<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* textureData);
 template __host__ short* modifyTextureRasterized<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* dicomData, unsigned char* polylineData);
 template __host__ unsigned short* modifyTextureRasterized<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);
+template __host__ short* modifySurfaceRasterized<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* dicomData, unsigned char* polylineData);
+template __host__ unsigned short* modifySurfaceRasterized<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);

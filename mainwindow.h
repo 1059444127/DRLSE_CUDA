@@ -22,6 +22,9 @@ class MainWindow : public QMainWindow
     public:
     MainWindow();
     ~MainWindow(){};
+
+    static MainWindow* instance;
+
     void ShowStatus(std::string message);
 
     private slots:

@@ -24,16 +24,22 @@ __constant__ float d_gaussKernel5[5*5] = {0.003765, 0.015019, 0.023792, 0.015019
                                           0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
                                           0.003765, 0.015019, 0.023792, 0.015019, 0.003765};
 
-//__constant__ float d_sobelX[5*5] = {2,   1,   0,   -1,  -2,
-//                                    3,   2,   0,   -2,  -3,
-//                                    4,   3,   0,   -3,  -4,
-//                                    3,   2,   0,   -2,  -3,
-//                                    2,   1,   0,   -1,  -2};
+__constant__ float d_sobelX[5*5] = {2,   1,   0,   -1,  -2,
+                                    3,   2,   0,   -2,  -3,
+                                    4,   3,   0,   -3,  -4,
+                                    3,   2,   0,   -2,  -3,
+                                    2,   1,   0,   -1,  -2};
+
+__constant__ float d_identity[5*5] =   {0,   0,   0,   0,  0,
+                                        0,   0,   0,   0,  0,
+                                        0,   0,   1,   0,  0,
+                                        0,   0,   0,   0,  0,
+                                        0,   0,   0,   0,  0};
 
 //====================================================================================
 //ERROR CHECKING MACRO
 //====================================================================================
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+#define eee(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
    if (code != cudaSuccess)
@@ -109,29 +115,26 @@ __global__ void rasterizerTestSurface(cudaSurfaceObject_t input, cudaSurfaceObje
 }
 
 template<typename T>
-__global__ void convolutionTest(cudaSurfaceObject_t input, cudaSurfaceObject_t output, int width, int height)
+__global__ void convolutionTest(cudaSurfaceObject_t input, cudaSurfaceObject_t output)
 {
     // Calculate surface coordinates
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (x > 1 && x < width-2 && y > 1 && y < height-2)
+    float sum = 0;
+    T sample;
+    for(int i = -2; i <= 2; i++)
     {
-        int sum = 0;
-        T sample;
-        for(int i = -2; i <= 2; i++)
+        for(int j = -2; j <= 2; j++)
         {
-            for(int j = -2; j <= 2; j++)
-            {
-                surf2Dread(&sample, input, (int)((x+i)*sizeof(sample)), (int)(y+j), cudaBoundaryModeClamp);
-                sum += sample * d_gaussKernel5[5*i+j];
-            }
+            surf2Dread(&sample, input, (x+i)*sizeof(sample), y+j, cudaBoundaryModeClamp);
+            sum += sample * d_gaussKernel5[5*(i+2) + (j+2)];
         }
-
-        //add some error checking calls and remove the boundary check above. Also, is there boundarymode for the write?
-
-        surf2Dwrite((T)sum, output, x * sizeof(sample), y, cudaBoundaryModeClamp);
     }
+
+    //add some error checking calls and remove the boundary check above. Also, is there boundarymode for the write?
+
+    surf2Dwrite((T)sum, output, x * sizeof(T), y, cudaBoundaryModeClamp);
 }
 
 
@@ -273,8 +276,8 @@ __host__ T* convolveImage(int imageWidth, int imageHeight, T* h_dataDicom)
     // Create a Surface with our image data and copy that data to the device
     cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(T), 0, 0, 0, FK);
     cudaArray* d_arrayDicom;
-    cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight);
-    cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice);
+    eee(cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight));
+    eee(cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice));
 
     cudaResourceDesc resDescDicom;
     memset(&resDescDicom, 0, sizeof(resDescDicom));
@@ -282,12 +285,12 @@ __host__ T* convolveImage(int imageWidth, int imageHeight, T* h_dataDicom)
     resDescDicom.res.array.array = d_arrayDicom;
 
     cudaSurfaceObject_t d_surfDicom = 0;
-    cudaCreateSurfaceObject(&d_surfDicom, &resDescDicom);
+    eee(cudaCreateSurfaceObject(&d_surfDicom, &resDescDicom));
 
 
     // Create an output surface
     cudaArray* d_arrayResult;
-    cudaMallocArray(&d_arrayResult, &channelFormatDicom, imageWidth, imageHeight);
+    eee(cudaMallocArray(&d_arrayResult, &channelFormatDicom, imageWidth, imageHeight));
 
     cudaResourceDesc resDescResult;
     memset(&resDescResult, 0, sizeof(resDescResult));
@@ -295,23 +298,29 @@ __host__ T* convolveImage(int imageWidth, int imageHeight, T* h_dataDicom)
     resDescResult.res.array.array = d_arrayResult;
 
     cudaSurfaceObject_t d_surfResult = 0;
-    cudaCreateSurfaceObject(&d_surfResult, &resDescResult);
+    eee(cudaCreateSurfaceObject(&d_surfResult, &resDescResult));
 
 
     // Run kernel
     dim3 block(imageWidth / 16, imageHeight / 16,1);
     dim3 grid(16,16,1);
-    convolutionTest<T> <<<grid, block>>>(d_surfDicom, d_surfResult, imageWidth, imageHeight);
+    convolutionTest<T> <<<grid, block>>>(d_surfDicom, d_surfResult);
+
+    // The synchronize call will force the host to wait for the kernel to finish. If we don't
+    // do this, we might get errors on future checks, but that indicate errors in the kernel, which
+    // can be confusing
+    eee(cudaPeekAtLastError());
+    eee(cudaDeviceSynchronize());
 
     // Copy results to host
     T* outputHost = (T*)malloc(sizeDicom);
-    cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost);
+    eee(cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
 
     // Cleanup
-    cudaDestroySurfaceObject(d_surfDicom);
-    cudaDestroySurfaceObject(d_surfResult);
-    cudaFreeArray(d_arrayDicom);
-    cudaFreeArray(d_arrayResult);
+    eee(cudaDestroySurfaceObject(d_surfDicom));
+    eee(cudaDestroySurfaceObject(d_surfResult));
+    eee(cudaFreeArray(d_arrayDicom));
+    eee(cudaFreeArray(d_arrayResult));
 
     return outputHost;
 }

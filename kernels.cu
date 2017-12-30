@@ -128,9 +128,9 @@ __global__ void convolutionTest(cudaSurfaceObject_t input, cudaSurfaceObject_t o
             }
         }
 
-        add some error checking calls and remove the boundary check above. Also, is there boundarymode for the write?
+        //add some error checking calls and remove the boundary check above. Also, is there boundarymode for the write?
 
-        surf2Dwrite((T)sum, output, x * sizeof(sample), y);
+        surf2Dwrite((T)sum, output, x * sizeof(sample), y, cudaBoundaryModeClamp);
     }
 }
 

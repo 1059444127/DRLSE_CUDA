@@ -7,6 +7,7 @@
 #include <QStatusBar>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QCloseEvent>
 
 #include <vtkRenderWindow.h>
 #include <vtkImageMapper3D.h>
@@ -68,6 +69,31 @@ MainWindow::MainWindow()
     {
         MainWindow::instance = this;
     }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    try
+    {
+        //We need to kill the interactor or else it will keep the event loop alive
+        auto inter = m_renderer->GetRenderWindow()->GetInteractor();
+        inter->GetRenderWindow()->Finalize();
+        inter->TerminateApp();
+    }
+    catch(...)
+    {
+
+    }
+
+    //Accept the close event, closing the app
+    event->accept();
+}
+
+//This fires when we pick File->Exit
+void MainWindow::on_actionExit_triggered()
+{
+    //Call closeEvent
+    this->close();
 }
 
 void MainWindow::ShowStatus(std::string message)
@@ -182,11 +208,6 @@ void MainWindow::on_actionOpen_Folder_triggered()
 //        //Renders the oct data
 //        this->renderOctRaw();
 //    }
-}
-
-void MainWindow::on_actionExit_triggered()
-{
-    qApp->exit();
 }
 
 void MainWindow::on_actionReset_view_triggered()

@@ -23,6 +23,8 @@ class MainWindow : public QMainWindow
     MainWindow();
     ~MainWindow(){};
 
+    void closeEvent(QCloseEvent *event) override;
+
     static MainWindow* instance;
 
     void ShowStatus(std::string message);

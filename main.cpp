@@ -11,9 +11,14 @@ int main(int argc, char** argv)
     //True color palette
     //QApplication::setStyle("Cleanlooks");
     QApplication a(argc, argv);
+
     MainWindow w;
     w.show();
 
-    return a.exec();
+    a.connect(&a, SIGNAL(lastWindowClosed()), &a, SLOT(quit()));
+
+    a.exec();
+
+    return 0;
 }
 

@@ -55,6 +55,7 @@
 #include <vtkTransformPolyDataFilter.h>
 #include <vtkAssemblyNode.h>
 #include <vtkAssemblyPath.h>
+#include <vtkImageCast.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -226,10 +227,13 @@ void MainWindow::on_actionOpenFile_triggered()
         dicomReader->Update();
         auto dicomImage = dicomReader->GetOutput();        
 
-        //vtkImageCast
+        VTK_NEW(vtkImageCast, castFilter);
+        castFilter->SetInputData(dicomImage);
+        castFilter->SetOutputScalarTypeToFloat();
+        castFilter->Update();
 
         m_mainActor = vtkSmartPointer<vtkImageActor>::New();
-        m_mainActor->GetMapper()->SetInputData(dicomImage);
+        m_mainActor->GetMapper()->SetInputData(castFilter->GetOutput());
         m_mainActor->InterpolateOff();
 
         VTK_NEW(vtkCallbackCommand, mouseMoveCallback);

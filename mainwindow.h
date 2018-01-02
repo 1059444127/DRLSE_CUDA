@@ -21,7 +21,7 @@ void vtkValueMessageTemplate(vtkImageData* image, int* position,
   int components = image->GetNumberOfScalarComponents();
   for (int c = 0; c < components; ++c)
   {
-    message += vtkVariant(tuple[c]).ToString();
+    message += to_string(tuple[c]);
     if (c != (components - 1))
     {
       message += ", ";

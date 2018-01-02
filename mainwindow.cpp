@@ -139,7 +139,6 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
     // make sure we picked the image actor
     vtkAssemblyPath* path = picker->GetPath();
     bool validPick = false;
-
     if (path)
     {
       vtkCollectionSimpleIterator sit;
@@ -154,7 +153,6 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
         }
       }
     }
-
     if (!validPick)
     {
       style->GetInteractor()->Render();
@@ -191,9 +189,13 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
         return;
     }
 
-    string fullMessage = "Location: (" + to_string(image_coordinate[0]) + ", " + to_string(image_coordinate[1]) + ", " + to_string(image_coordinate[2]) + ")\nValue: (" + valueString + ")";
+    //Add text on the bottom left with location and value
+    string fullMessage = "Location: (" + to_string(image_coordinate[0]) + ", " +
+                                         to_string(image_coordinate[1]) + ", " +
+                                         to_string(image_coordinate[2]) + ")\nValue: (" + valueString + ")";
     cornerAnn->SetText(0, fullMessage.c_str());
 
+    //Get current windowing info, and add text on bottom right with WW and WC
     auto imageProperty = style->GetCurrentImageProperty();
     if(imageProperty != nullptr)
     {
@@ -240,9 +242,7 @@ void MainWindow::on_actionOpenFile_triggered()
         m_cornerAnn = vtkSmartPointer<vtkCornerAnnotation>::New();
         m_cornerAnn->SetLinearFontScaleFactor(2);
         m_cornerAnn->SetNonlinearFontScaleFactor(1);
-        m_cornerAnn->SetMaximumFontSize(20);
-        m_cornerAnn->SetText(0, "Off image");
-        m_cornerAnn->SetText(3, "<window>\n<level>");
+        m_cornerAnn->SetMaximumFontSize(14);
         m_cornerAnn->GetTextProperty()->SetColor(1, 1, 1);
         m_cornerAnn->SetImageActor(m_mainActor);
 

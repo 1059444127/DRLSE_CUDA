@@ -121,19 +121,6 @@ void MainWindow::ShowStatus(string message)
     this->statusBar()->showMessage(QString::fromStdString(message));
 }
 
-void WindowLevelCallbackFunction (vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
-{
-    vtkInteractorStyleImage* style = static_cast<vtkInteractorStyleImage*>(caller);
-
-    int w[2];
-    style->GetWindowLevelStartPosition(w);
-
-    int windowWidth = w[0];
-    int windowLevel = w[1];
-
-    MainWindow::instance->ShowStatus("WW: " + to_string(windowWidth) + ", WC: " + to_string(windowLevel));
-}
-
 void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
 {
     vtkInteractorStyleImage* style = static_cast<vtkInteractorStyleImage*>(caller);
@@ -207,6 +194,16 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
     string fullMessage = "Location: (" + to_string(image_coordinate[0]) + ", " + to_string(image_coordinate[1]) + ", " + to_string(image_coordinate[2]) + ")\nValue: (" + valueString + ")";
     cornerAnn->SetText(0, fullMessage.c_str());
 
+    auto imageProperty = style->GetCurrentImageProperty();
+    if(imageProperty != nullptr)
+    {
+        auto window = imageProperty->GetColorWindow();
+        auto level = imageProperty->GetColorLevel();
+
+        string windowMessage = "WW: (" + to_string(window) + ")\nWC: (" + to_string(level) + ")";
+        cornerAnn->SetText(1, windowMessage.c_str());
+    }
+
     style->GetInteractor()->Render();
     style->OnMouseMove();
 }
@@ -236,9 +233,6 @@ void MainWindow::on_actionOpenFile_triggered()
         VTK_NEW(vtkCallbackCommand, mouseMoveCallback);
         mouseMoveCallback->SetCallback(MouseMoveCallbackFunction);
 
-        VTK_NEW(vtkCallbackCommand, windowLevelCallback);
-        windowLevelCallback->SetCallback(WindowLevelCallbackFunction);
-
         m_picker = vtkSmartPointer<vtkPropPicker>::New();
         m_picker->PickFromListOn();
         m_picker->AddPickList(m_mainActor); //Give the picker a prop to pick
@@ -253,7 +247,6 @@ void MainWindow::on_actionOpenFile_triggered()
         m_cornerAnn->SetImageActor(m_mainActor);
 
         VTK_NEW(vtkInteractorStyleImage, style);
-        //style->AddObserver(vtkCommand::WindowLevelEvent, windowLevelCallback);
         style->AddObserver(vtkCommand::MouseMoveEvent, mouseMoveCallback);
 
         VTK_NEW(vtkRenderWindowInteractor, interactor);

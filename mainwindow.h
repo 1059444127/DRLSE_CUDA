@@ -68,6 +68,7 @@ class MainWindow : public QMainWindow
     void on_actionRasterize_polylines_triggered();
     void on_actionTest_Sobel_filter_triggered();
     void on_actionTest_Gaussian_filter_triggered();
+    void on_actionTest_edge_indicator_triggered();
 
 private:
     Ui::MainWindow *ui;

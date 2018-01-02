@@ -496,3 +496,18 @@ void MainWindow::on_actionTest_Gaussian_filter_triggered()
 
     this->ui->qvtkWidget->repaint();
 }
+
+void MainWindow::on_actionTest_edge_indicator_triggered()
+{
+    //Get currently displayed imageData
+    auto dicomImageData = m_mainActor->GetInput();
+
+    //Apply our CUDA kernel to it
+    auto outputData = testEdgeIndicator(dicomImageData);
+
+    //Display results
+    m_mainActor->GetMapper()->RemoveAllInputs();
+    m_mainActor->SetInputData(outputData);
+
+    this->ui->qvtkWidget->repaint();
+}

@@ -93,6 +93,7 @@
     </property>
     <addaction name="actionTest_Sobel_filter"/>
     <addaction name="actionTest_Gaussian_filter"/>
+    <addaction name="actionTest_edge_indicator"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
@@ -161,6 +162,11 @@
   <action name="actionTest_Gaussian_filter">
    <property name="text">
     <string>Test Gaussian filter</string>
+   </property>
+  </action>
+  <action name="actionTest_edge_indicator">
+   <property name="text">
+    <string>Test edge indicator</string>
    </property>
   </action>
  </widget>

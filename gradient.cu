@@ -18,7 +18,6 @@ __constant__ float d_sobelY[5*5] = {1,   4,   6,   4,   1,
                                    -2,  -8, -12,  -8,  -2,
                                    -1,  -4,  -6,  -4,  -1};
 
-template<typename T>
 __global__ void sobelKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t output)
 {
     // Calculate surface coordinates
@@ -28,7 +27,7 @@ __global__ void sobelKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t outpu
     float sumX = 0;
     float sumY = 0;
     int index = 0;
-    T sample;
+    float sample;
 
     for(int i = -2; i <= 2; i++)
     {
@@ -42,19 +41,18 @@ __global__ void sobelKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t outpu
         }
     }
 
-    surf2Dwrite(make_float2(sumX, sumY),
-                output, x * sizeof(float2),
+    surf2Dwrite(sumY,
+                output, x * sizeof(float),
                 y,
                 cudaBoundaryModeClamp);
 }
 
-template<typename T, cudaChannelFormatKind FK>
-__host__ float* applySobelFilter(int imageWidth, int imageHeight, T* h_dataDicom)
+__host__ float* applySobelFilter(int imageWidth, int imageHeight, float* h_dataDicom)
 {
-    size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
+    size_t sizeDicom = imageWidth * imageHeight * sizeof(float);
 
     // Create a Surface with our image data and copy that data to the device
-    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(T), 0, 0, 0, FK);
+    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(float), 0, 0, 0, cudaChannelFormatKindFloat);
     cudaArray* d_arrayDicom;
     eee(cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight));
     eee(cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice));
@@ -69,7 +67,7 @@ __host__ float* applySobelFilter(int imageWidth, int imageHeight, T* h_dataDicom
 
 
     // Create an output surface, 32-bit float for x, y and magnitude
-    cudaChannelFormatDesc channelFormatGrad = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
+    cudaChannelFormatDesc channelFormatGrad = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaArray* d_arrayResult;
     eee(cudaMallocArray(&d_arrayResult, &channelFormatGrad, imageWidth, imageHeight));
 
@@ -85,7 +83,7 @@ __host__ float* applySobelFilter(int imageWidth, int imageHeight, T* h_dataDicom
     // Run kernel
     dim3 block(imageWidth / 16, imageHeight / 16,1);
     dim3 grid(16,16,1);
-    sobelKernel<T> <<<grid, block>>>(d_surfDicom, d_surfResult);
+    sobelKernel<<<grid, block>>>(d_surfDicom, d_surfResult);
 
     // The synchronize call will force the host to wait for the kernel to finish. If we don't
     // do this, we might get errors on future checks, but that indicate errors in the kernel, which
@@ -94,7 +92,7 @@ __host__ float* applySobelFilter(int imageWidth, int imageHeight, T* h_dataDicom
     eee(cudaDeviceSynchronize());
 
     // Copy results to host
-    float* outputHost = (float*)malloc(sizeDicom);
+    float* outputHost = (float*)malloc(sizeDicom); //return 2 channels
     eee(cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
 
     // Cleanup
@@ -106,7 +104,3 @@ __host__ float* applySobelFilter(int imageWidth, int imageHeight, T* h_dataDicom
 
     return outputHost;
 }
-
-//Explicit instantiation since the compiler has no idea these will be needed in other compilation units
-template __host__ float* applySobelFilter<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* textureData);
-template __host__ float* applySobelFilter<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* textureData);

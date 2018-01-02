@@ -22,7 +22,6 @@
 
 vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
 {
-    auto type = std::string(input->GetScalarTypeAsString());
     int* inputDims = input->GetDimensions();
 
     //Copy input spatial info into a result image
@@ -40,36 +39,11 @@ vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
     outputImage->SetOrigin(origin);
     outputImage->SetExtent(extent);
 
-    float* outputScalarPointer;
-    if(type == "short")
-    {
-        //Get pointer to input data
-        short* inputScalarPointer = static_cast<short*>(input->GetScalarPointer());
+    //Get pointer to input data
+    float* inputScalarPointer = static_cast<float*>(input->GetScalarPointer());
 
-        //Execute kernel
-        outputScalarPointer = applySobelFilter<short, cudaChannelFormatKindSigned>(
-                    inputDims[0],
-                    inputDims[1],
-                    inputScalarPointer);
-
-    }
-    else if(type == "unsigned short")
-    {
-        //Get pointer to input data
-        unsigned short* inputScalarPointer = static_cast<unsigned short*>(input->GetScalarPointer());
-
-        //Execute kernel
-        outputScalarPointer = applySobelFilter<unsigned short, cudaChannelFormatKindUnsigned>(
-                    inputDims[0],
-                    inputDims[1],
-                    inputScalarPointer);
-
-    }
-    else
-    {
-        fprintf(stderr, "Invalid vtkImageData scalar type!");
-        return nullptr;
-    }
+    //Execute kernel
+    float* outputScalarPointer = applySobelFilter(inputDims[0], inputDims[1], inputScalarPointer);
 
     // cudaDeviceReset must be called before exiting in order for profiling and
     // tracing tools such as Nsight and Visual Profiler to show complete traces.
@@ -81,13 +55,13 @@ vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
 
     //Insert results into a vtk array
     VTK_NEW(vtkFloatArray, outputArr);
-    outputArr->SetNumberOfComponents(2);
+    outputArr->SetNumberOfComponents(1);
     outputArr->SetArray(outputScalarPointer, inputDims[0] * inputDims[1], 1); //last 1 to take ownership of outputScalarPointer, will use its memory
 
     //Insert vtk array into result image
     auto outInfo = outputImage->GetInformation();
     vtkImageData::SetScalarType(VTK_FLOAT, outInfo);
-    vtkImageData::SetNumberOfScalarComponents(2, outInfo);
+    vtkImageData::SetNumberOfScalarComponents(1, outInfo);
     outputImage->SetInformation(outInfo);
     outputImage->GetPointData()->SetScalars(outputArr);
 

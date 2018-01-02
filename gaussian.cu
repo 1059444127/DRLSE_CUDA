@@ -19,7 +19,6 @@ __constant__ float d_gaussKernel5[5*5] = {0.003765f, 0.015019f, 0.023792f, 0.015
                                           0.015019f, 0.059912f, 0.094907f, 0.059912f, 0.015019f,
                                           0.003765f, 0.015019f, 0.023792f, 0.015019f, 0.003765f};
 
-template<typename T>
 __global__ void gaussianKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t output)
 {
     // Calculate surface coordinates
@@ -27,7 +26,7 @@ __global__ void gaussianKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t ou
     unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     float sum = 0;
-    T sample;
+    float sample;
 
     for(int i = -2; i <= 2; i++)
     {
@@ -44,13 +43,12 @@ __global__ void gaussianKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t ou
                 cudaBoundaryModeClamp);
 }
 
-template<typename T, cudaChannelFormatKind FK>
-__host__ T* applyGaussianFilter(int imageWidth, int imageHeight, T* h_dataDicom)
+__host__ float* applyGaussianFilter(int imageWidth, int imageHeight, float* h_dataDicom)
 {
-    size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
+    size_t sizeDicom = imageWidth * imageHeight * sizeof(float);
 
     // Create a Surface with our image data and copy that data to the device
-    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(T), 0, 0, 0, FK);
+    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(float), 0, 0, 0, cudaChannelFormatKindFloat);
     cudaArray* d_arrayDicom;
     eee(cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight));
     eee(cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice));
@@ -80,7 +78,7 @@ __host__ T* applyGaussianFilter(int imageWidth, int imageHeight, T* h_dataDicom)
     // Run kernel
     dim3 block(imageWidth / 16, imageHeight / 16,1);
     dim3 grid(16,16,1);
-    gaussianKernel<T> <<<grid, block>>>(d_surfDicom, d_surfResult);
+    gaussianKernel<<<grid, block>>>(d_surfDicom, d_surfResult);
 
     // The synchronize call will force the host to wait for the kernel to finish. If we don't
     // do this, we might get errors on future checks, but that indicate errors in the kernel, which
@@ -89,7 +87,7 @@ __host__ T* applyGaussianFilter(int imageWidth, int imageHeight, T* h_dataDicom)
     eee(cudaDeviceSynchronize());
 
     // Copy results to host
-    T* outputHost = (T*)malloc(sizeDicom);
+    float* outputHost = (float*)malloc(sizeDicom);
     eee(cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
 
     // Cleanup
@@ -101,7 +99,3 @@ __host__ T* applyGaussianFilter(int imageWidth, int imageHeight, T* h_dataDicom)
 
     return outputHost;
 }
-
-//Explicit instantiation since the compiler has no idea these will be needed in other compilation units
-template __host__ short* applyGaussianFilter<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* textureData);
-template __host__ unsigned short* applyGaussianFilter<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* textureData);

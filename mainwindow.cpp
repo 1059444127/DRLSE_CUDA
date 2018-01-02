@@ -1,3 +1,13 @@
+/* References:
+ *  picker https://lorensen.github.io/VTKExamples/site/Cxx/Images/PickPixel2/
+ *
+ *
+ *
+ *
+ *
+ *
+ * */
+
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -31,7 +41,9 @@
 #include <vtkCleanPolyData.h>
 #include <vtkSphereSource.h>
 #include <vtkRotationalExtrusionFilter.h>
-
+#include <vtkCornerAnnotation.h>
+#include <vtkTextProperty.h>
+#include <vtkPropPicker.h>
 #include <vtkImageTracerWidget.h>
 #include <vtkImageCanvasSource2D.h>
 #include <vtkProperty.h>
@@ -41,6 +53,8 @@
 #include <vtkTubeFilter.h>
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
+#include <vtkAssemblyNode.h>
+#include <vtkAssemblyPath.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -48,6 +62,8 @@
 
 //Makes these long declarations a little more readable
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
+
+using namespace std;
 
 MainWindow* MainWindow::instance;
 
@@ -100,7 +116,7 @@ void MainWindow::on_actionExit_triggered()
     this->close();
 }
 
-void MainWindow::ShowStatus(std::string message)
+void MainWindow::ShowStatus(string message)
 {
     this->statusBar()->showMessage(QString::fromStdString(message));
 }
@@ -115,7 +131,7 @@ void WindowLevelCallbackFunction (vtkObject* caller, unsigned long eid, void* cl
     int windowWidth = w[0];
     int windowLevel = w[1];
 
-    MainWindow::instance->ShowStatus("WW: " + std::to_string(windowWidth) + ", WC: " + std::to_string(windowLevel));    
+    MainWindow::instance->ShowStatus("WW: " + to_string(windowWidth) + ", WC: " + to_string(windowLevel));
 }
 
 void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
@@ -124,8 +140,74 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
 
     auto eventPos = style->GetInteractor()->GetEventPosition();
 
-    std::cout << std::to_string(eventPos[0]) << ", " << std::to_string(eventPos[1]) << std::endl;
+    auto mainActor = MainWindow::instance->GetActor();
+    auto picker = MainWindow::instance->GetPicker();
+    auto renderer = MainWindow::instance->GetRenderer();
+    auto cornerAnn = MainWindow::instance->GetCornerAnnotation();
+    auto image = mainActor->GetInput();
 
+    picker->Pick(eventPos[0], eventPos[1], 0, renderer);
+
+    // There could be other props assigned to this picker, so
+    // make sure we picked the image actor
+    vtkAssemblyPath* path = picker->GetPath();
+    bool validPick = false;
+
+    if (path)
+    {
+      vtkCollectionSimpleIterator sit;
+      path->InitTraversal(sit);
+      vtkAssemblyNode *node;
+      for (int i = 0; i < path->GetNumberOfItems() && !validPick; ++i)
+      {
+        node = path->GetNextNode(sit);
+        if (mainActor == vtkImageActor::SafeDownCast(node->GetViewProp()))
+        {
+          validPick = true;
+        }
+      }
+    }
+
+    if (!validPick)
+    {
+      style->GetInteractor()->Render();
+      // Pass the event further on
+      style->OnMouseMove();
+      return;
+    }
+
+    //Get world position of the pick
+    double pos[3];
+    picker->GetPickPosition(pos);
+
+    //Convert world position to voxel index...
+    double origin[3];
+    double spacing[3];
+    image->GetOrigin(origin);
+    image->GetSpacing(spacing);
+    pos[0] = (pos[0] - origin[0]) / spacing[0];
+    pos[1] = (pos[1] - origin[1]) / spacing[1];
+    pos[2] = (pos[2] - origin[2]) / spacing[2];
+
+    //Round it down to ints...
+    int image_coordinate[3];
+    image_coordinate[0] = vtkMath::Round(pos[0]);
+    image_coordinate[1] = vtkMath::Round(pos[1]);
+    image_coordinate[2] = 0;
+
+    //Get value string with crazy VTK template tricks
+    string valueString;
+    switch (image->GetScalarType())
+    {
+      vtkTemplateMacro((vtkValueMessageTemplate<VTK_TT>(image, image_coordinate, valueString)));
+      default:
+        return;
+    }
+
+    string fullMessage = "Location: (" + to_string(image_coordinate[0]) + ", " + to_string(image_coordinate[1]) + ", " + to_string(image_coordinate[2]) + ")\nValue: (" + valueString + ")";
+    cornerAnn->SetText(0, fullMessage.c_str());
+
+    style->GetInteractor()->Render();
     style->OnMouseMove();
 }
 
@@ -137,7 +219,7 @@ void MainWindow::on_actionOpenFile_triggered()
 
     if(!fileName.isEmpty())
     {
-        std::string fileNameStd = fileName.toStdString();
+        string fileNameStd = fileName.toStdString();
 
         //Read all DICOM files in the specified directory
         VTK_NEW(vtkDICOMImageReader, dicomReader);
@@ -145,8 +227,11 @@ void MainWindow::on_actionOpenFile_triggered()
         dicomReader->Update();
         auto dicomImage = dicomReader->GetOutput();        
 
+        //vtkImageCast
+
         m_mainActor = vtkSmartPointer<vtkImageActor>::New();
         m_mainActor->GetMapper()->SetInputData(dicomImage);
+        m_mainActor->InterpolateOff();
 
         VTK_NEW(vtkCallbackCommand, mouseMoveCallback);
         mouseMoveCallback->SetCallback(MouseMoveCallbackFunction);
@@ -154,18 +239,34 @@ void MainWindow::on_actionOpenFile_triggered()
         VTK_NEW(vtkCallbackCommand, windowLevelCallback);
         windowLevelCallback->SetCallback(WindowLevelCallbackFunction);
 
-        VTK_NEW(vtkRenderWindowInteractor, interactor);
-        interactor->SetRenderWindow(m_renderer->GetRenderWindow());
+        m_picker = vtkSmartPointer<vtkPropPicker>::New();
+        m_picker->PickFromListOn();
+        m_picker->AddPickList(m_mainActor); //Give the picker a prop to pick
+
+        m_cornerAnn = vtkSmartPointer<vtkCornerAnnotation>::New();
+        m_cornerAnn->SetLinearFontScaleFactor(2);
+        m_cornerAnn->SetNonlinearFontScaleFactor(1);
+        m_cornerAnn->SetMaximumFontSize(20);
+        m_cornerAnn->SetText(0, "Off image");
+        m_cornerAnn->SetText(3, "<window>\n<level>");
+        m_cornerAnn->GetTextProperty()->SetColor(1, 1, 1);
+        m_cornerAnn->SetImageActor(m_mainActor);
 
         VTK_NEW(vtkInteractorStyleImage, style);
-        interactor->SetInteractorStyle(style);
         //style->AddObserver(vtkCommand::WindowLevelEvent, windowLevelCallback);
         style->AddObserver(vtkCommand::MouseMoveEvent, mouseMoveCallback);
 
+        VTK_NEW(vtkRenderWindowInteractor, interactor);
+        interactor->SetRenderWindow(m_renderer->GetRenderWindow());
+        interactor->SetInteractorStyle(style);
+
+        m_renderer->RemoveAllViewProps();
         m_renderer->AddActor(m_mainActor);
+        m_renderer->AddViewProp(m_cornerAnn);
         m_renderer->GetActiveCamera()->SetParallelProjection(1);
         m_renderer->ResetCamera();
 
+        interactor->Initialize();
         interactor->Start();
     }
 }
@@ -185,7 +286,7 @@ void MainWindow::on_actionOpen_Folder_triggered()
 //        dicomReader->SetFileN
 
         //Create an input file stream
-//        std::ifstream inputFile(fileName.toStdString().c_str());
+//        ifstream inputFile(fileName.toStdString().c_str());
 
 //        //If the file isn't open, show an error box
 //        if(!inputFile)
@@ -195,18 +296,18 @@ void MainWindow::on_actionOpen_Folder_triggered()
 //        }
 
 //        //Get the file size
-//        inputFile.seekg(0, std::ios::end);
+//        inputFile.seekg(0, ios::end);
 //        int fileSize = inputFile.tellg();
-//        inputFile.seekg(0, std::ios::beg);
+//        inputFile.seekg(0, ios::beg);
 
 //        //Read the file into data
-//        std::vector<uint8_t> data(fileSize);
+//        vector<uint8_t> data(fileSize);
 //        inputFile.read((char*) &data[0], fileSize);
 
 //        //Extract the data dimensions from the header
-//        std::memcpy(&m_rawLength, &(data[16]), 4*sizeof(uint8_t));
-//        std::memcpy(&m_rawWidth, &(data[20]), 4*sizeof(uint8_t));
-//        std::memcpy(&m_rawDepth, &(data[24]), 4*sizeof(uint8_t));
+//        memcpy(&m_rawLength, &(data[16]), 4*sizeof(uint8_t));
+//        memcpy(&m_rawWidth, &(data[20]), 4*sizeof(uint8_t));
+//        memcpy(&m_rawDepth, &(data[24]), 4*sizeof(uint8_t));
 
 //        //Setup to display oct data with 0 bytes of frameHeaders
 //        this->setUpForOctRaw(m_rawOctPolyData, data, 0, 512);
@@ -356,8 +457,8 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     m_polyLineActor->GetMapper()->BackgroundOff();
     m_polyLineActor->SetOpacity(0.5);
 
-    m_mainActor->GetInput()->Print(std::cout);
-    whiteImage->Print(std::cout);
+    m_mainActor->GetInput()->Print(cout);
+    whiteImage->Print(cout);
 
     //m_renderer->RemoveAllViewProps();
     m_renderer->AddActor(m_polyLineActor);

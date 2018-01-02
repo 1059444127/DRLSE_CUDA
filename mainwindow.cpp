@@ -63,6 +63,10 @@ MainWindow::MainWindow()
 
     //Add the renderer to the render window Qt widget
     m_renderer = vtkSmartPointer<vtkRenderer>::New();
+    m_renderer->GradientBackgroundOn();
+    m_renderer->SetBackground(0, 0, 0.2);
+    m_renderer->SetBackground2(0.1, 0.1, 0.1);
+
     this->ui->qvtkWidget->GetRenderWindow()->AddRenderer(m_renderer);
 
     if(MainWindow::instance == nullptr)
@@ -101,7 +105,7 @@ void MainWindow::ShowStatus(std::string message)
     this->statusBar()->showMessage(QString::fromStdString(message));
 }
 
-void CallbackFunction (vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
+void WindowLevelCallbackFunction (vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
 {
     vtkInteractorStyleImage* style = static_cast<vtkInteractorStyleImage*>(caller);
 
@@ -111,7 +115,18 @@ void CallbackFunction (vtkObject* caller, unsigned long eid, void* clientdata, v
     int windowWidth = w[0];
     int windowLevel = w[1];
 
-    MainWindow::instance->ShowStatus("WW: " + std::to_string(windowWidth) + ", WC: " + std::to_string(windowLevel));
+    MainWindow::instance->ShowStatus("WW: " + std::to_string(windowWidth) + ", WC: " + std::to_string(windowLevel));    
+}
+
+void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clientdata, void *calldata)
+{
+    vtkInteractorStyleImage* style = static_cast<vtkInteractorStyleImage*>(caller);
+
+    auto eventPos = style->GetInteractor()->GetEventPosition();
+
+    std::cout << std::to_string(eventPos[0]) << ", " << std::to_string(eventPos[1]) << std::endl;
+
+    style->OnMouseMove();
 }
 
 void MainWindow::on_actionOpenFile_triggered()
@@ -128,24 +143,25 @@ void MainWindow::on_actionOpenFile_triggered()
         VTK_NEW(vtkDICOMImageReader, dicomReader);
         dicomReader->SetFileName(fileNameStd.c_str());
         dicomReader->Update();
-        auto dicomImage = dicomReader->GetOutput();
+        auto dicomImage = dicomReader->GetOutput();        
 
         m_mainActor = vtkSmartPointer<vtkImageActor>::New();
-        m_mainActor->GetMapper()->SetBackground(125);
         m_mainActor->GetMapper()->SetInputData(dicomImage);
-        //m_mainActor->SetOpacity(0.5);
 
-        VTK_NEW(vtkCallbackCommand, callback);
-        callback->SetCallback(CallbackFunction);
+        VTK_NEW(vtkCallbackCommand, mouseMoveCallback);
+        mouseMoveCallback->SetCallback(MouseMoveCallbackFunction);
+
+        VTK_NEW(vtkCallbackCommand, windowLevelCallback);
+        windowLevelCallback->SetCallback(WindowLevelCallbackFunction);
 
         VTK_NEW(vtkRenderWindowInteractor, interactor);
         interactor->SetRenderWindow(m_renderer->GetRenderWindow());
 
         VTK_NEW(vtkInteractorStyleImage, style);
         interactor->SetInteractorStyle(style);
-        //style->AddObserver(vtkCommand::InteractionEvent, callback);
+        //style->AddObserver(vtkCommand::WindowLevelEvent, windowLevelCallback);
+        style->AddObserver(vtkCommand::MouseMoveEvent, mouseMoveCallback);
 
-        //m_renderer->AddActor(canvasImageActor);
         m_renderer->AddActor(m_mainActor);
         m_renderer->GetActiveCamera()->SetParallelProjection(1);
         m_renderer->ResetCamera();
@@ -214,20 +230,6 @@ void MainWindow::on_actionReset_view_triggered()
 {
     m_renderer->ResetCamera();
     m_renderer->GetActiveCamera()->SetViewUp(0,1,0);
-    this->ui->qvtkWidget->repaint();
-}
-
-void MainWindow::on_actionTest_CUDA_triggered()
-{
-    //Get currently displayed imageData
-    auto inputData = m_mainActor->GetInput();
-
-    //Apply our CUDA kernel to it
-    auto outputData = testCUDA(inputData);
-
-    //Display results
-    m_mainActor->GetMapper()->RemoveAllInputs();
-    m_mainActor->SetInputData(outputData);
     this->ui->qvtkWidget->repaint();
 }
 
@@ -367,37 +369,22 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     on_actionClear_polylines_triggered();
 }
 
-void MainWindow::on_actionTest_CUDA_rasterized_triggered()
+void MainWindow::on_actionTest_Sobel_filter_triggered()
 {
     //Get currently displayed imageData
     auto dicomImageData = m_mainActor->GetInput();
 
-    //Get rasterized polyline imageData
-    auto polyLineImageData = m_polyLineActor->GetInput();
-
     //Apply our CUDA kernel to it
-    auto outputData = testCUDAandRasterized(dicomImageData, polyLineImageData);
+    auto outputData = testSobelFilter(dicomImageData);
 
     //Display results
     m_mainActor->GetMapper()->RemoveAllInputs();
     m_mainActor->SetInputData(outputData);
 
-    m_renderer->RemoveAllViewProps();
-    m_renderer->AddActor(m_mainActor);
     this->ui->qvtkWidget->repaint();
 }
 
-void MainWindow::on_actionTest_convolution_triggered()
+void MainWindow::on_actionTest_Gaussian_filter_triggered()
 {
-    //Get currently displayed imageData
-    auto dicomImageData = m_mainActor->GetInput();
 
-    //Apply our CUDA kernel to it
-    auto outputData = testConvolution(dicomImageData);
-
-    //Display results
-    m_mainActor->GetMapper()->RemoveAllInputs();
-    m_mainActor->SetInputData(outputData);
-
-    this->ui->qvtkWidget->repaint();
 }

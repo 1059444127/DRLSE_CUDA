@@ -33,13 +33,12 @@ class MainWindow : public QMainWindow
     void on_actionOpenFile_triggered();
     void on_actionOpen_Folder_triggered();
     void on_actionExit_triggered();
-    void on_actionReset_view_triggered();
-    void on_actionTest_CUDA_triggered();
+    void on_actionReset_view_triggered();    
     void on_actionCreate_polyline_triggered();
     void on_actionClear_polylines_triggered();
     void on_actionRasterize_polylines_triggered();
-    void on_actionTest_CUDA_rasterized_triggered();
-    void on_actionTest_convolution_triggered();
+    void on_actionTest_Sobel_filter_triggered();
+    void on_actionTest_Gaussian_filter_triggered();
 
 private:
     Ui::MainWindow *ui;

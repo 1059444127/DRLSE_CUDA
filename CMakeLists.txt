@@ -29,10 +29,15 @@ set(HEADERS
 
 set(KERNELS_SOURCES
     kernels.cu
+    gradient.cu
+    gaussian.cu
     )
 
 set(KERNELS_HEADERS
     kernels.cuh
+    gradient.cuh
+    common.cuh
+    gaussian.cuh
     )
 
 set(UI

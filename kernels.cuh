@@ -12,5 +12,3 @@ __host__ T* modifyTextureRasterized(int imageWidth, int imageHeight, T* dicomDat
 template<typename T, cudaChannelFormatKind FK>
 __host__ T* modifySurfaceRasterized(int imageWidth, int imageHeight, T* dicomData, unsigned char* polylineData);
 
-template<typename T, cudaChannelFormatKind FK>
-__host__ T* convolveImage(int imageWidth, int imageHeight, T* textureData);

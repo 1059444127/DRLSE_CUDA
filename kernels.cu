@@ -1,53 +1,10 @@
 #include <device_launch_parameters.h>
 #include <cuda_runtime.h>
-#include <cooperative_groups.h>
+
 #include <stdio.h>
 
 #include <kernels.cuh>
-
-namespace cg = cooperative_groups;
-
-#define KERNEL_RADIUS 1
-#define ROWS_BLOCKDIM_X 32 //Width of a sub-segment
-#define ROWS_BLOCKDIM_Y 4 //Height of a sub-segment (and shared block)
-#define ROWS_RESULT_STEPS 8 //Number of pixels each work item processes horizontally
-#define ROWS_HALO_STEPS 1 //Number of pixels each work item processes on each halo
-#define COLUMNS_BLOCKDIM_X 32 //At least 32 so that we can get one row per transaction
-#define COLUMNS_BLOCKDIM_Y 16
-#define COLUMNS_RESULT_STEPS 8 //Number of pixels each work item processes vertically
-#define COLUMNS_HALO_STEPS 1
-
-__constant__ float d_gaussKernel3[3*3];
-__constant__ float d_gaussKernel5[5*5] = {0.003765, 0.015019, 0.023792, 0.015019, 0.003765,
-                                          0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
-                                          0.023792, 0.094907, 0.150342, 0.094907, 0.023792,
-                                          0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
-                                          0.003765, 0.015019, 0.023792, 0.015019, 0.003765};
-
-__constant__ float d_sobelX[5*5] = {2,   1,   0,   -1,  -2,
-                                    3,   2,   0,   -2,  -3,
-                                    4,   3,   0,   -3,  -4,
-                                    3,   2,   0,   -2,  -3,
-                                    2,   1,   0,   -1,  -2};
-
-__constant__ float d_identity[5*5] =   {0,   0,   0,   0,  0,
-                                        0,   0,   0,   0,  0,
-                                        0,   0,   1,   0,  0,
-                                        0,   0,   0,   0,  0,
-                                        0,   0,   0,   0,  0};
-
-//====================================================================================
-//ERROR CHECKING MACRO
-//====================================================================================
-#define eee(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
+#include <common.cuh>
 
 //====================================================================================
 //KERNELS
@@ -106,37 +63,13 @@ __global__ void rasterizerTestSurface(cudaSurfaceObject_t input, cudaSurfaceObje
             for(int j = -2; j <= 2; j++)
             {
                 surf2Dread(&sample, input, (int)((x+i)*sizeof(sample)), (int)(y+j));
-                sum += sample * d_gaussKernel5[5*i+j];
+                //sum += sample * d_gaussKernel5[5*i+j];
             }
         }
 
         surf2Dwrite((short)sum, output, x * sizeof(sample), y);
     }
 }
-
-template<typename T>
-__global__ void convolutionTest(cudaSurfaceObject_t input, cudaSurfaceObject_t output)
-{
-    // Calculate surface coordinates
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-    float sum = 0;
-    T sample;
-    for(int i = -2; i <= 2; i++)
-    {
-        for(int j = -2; j <= 2; j++)
-        {
-            surf2Dread(&sample, input, (x+i)*sizeof(sample), y+j, cudaBoundaryModeClamp);
-            sum += sample * d_gaussKernel5[5*(i+2) + (j+2)];
-        }
-    }
-
-    //add some error checking calls and remove the boundary check above. Also, is there boundarymode for the write?
-
-    surf2Dwrite((T)sum, output, x * sizeof(T), y, cudaBoundaryModeClamp);
-}
-
 
 //====================================================================================
 //HOST CUDA FUNCTIONS
@@ -269,63 +202,6 @@ __host__ T* modifyTextureRasterized(int imageWidth, int imageHeight, T* dicomDat
 }
 
 template<typename T, cudaChannelFormatKind FK>
-__host__ T* convolveImage(int imageWidth, int imageHeight, T* h_dataDicom)
-{
-    size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
-
-    // Create a Surface with our image data and copy that data to the device
-    cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(8 * sizeof(T), 0, 0, 0, FK);
-    cudaArray* d_arrayDicom;
-    eee(cudaMallocArray(&d_arrayDicom, &channelFormatDicom, imageWidth, imageHeight));
-    eee(cudaMemcpyToArray(d_arrayDicom, 0, 0, h_dataDicom, sizeDicom, cudaMemcpyHostToDevice));
-
-    cudaResourceDesc resDescDicom;
-    memset(&resDescDicom, 0, sizeof(resDescDicom));
-    resDescDicom.resType = cudaResourceTypeArray;
-    resDescDicom.res.array.array = d_arrayDicom;
-
-    cudaSurfaceObject_t d_surfDicom = 0;
-    eee(cudaCreateSurfaceObject(&d_surfDicom, &resDescDicom));
-
-
-    // Create an output surface
-    cudaArray* d_arrayResult;
-    eee(cudaMallocArray(&d_arrayResult, &channelFormatDicom, imageWidth, imageHeight));
-
-    cudaResourceDesc resDescResult;
-    memset(&resDescResult, 0, sizeof(resDescResult));
-    resDescResult.resType = cudaResourceTypeArray;
-    resDescResult.res.array.array = d_arrayResult;
-
-    cudaSurfaceObject_t d_surfResult = 0;
-    eee(cudaCreateSurfaceObject(&d_surfResult, &resDescResult));
-
-
-    // Run kernel
-    dim3 block(imageWidth / 16, imageHeight / 16,1);
-    dim3 grid(16,16,1);
-    convolutionTest<T> <<<grid, block>>>(d_surfDicom, d_surfResult);
-
-    // The synchronize call will force the host to wait for the kernel to finish. If we don't
-    // do this, we might get errors on future checks, but that indicate errors in the kernel, which
-    // can be confusing
-    eee(cudaPeekAtLastError());
-    eee(cudaDeviceSynchronize());
-
-    // Copy results to host
-    T* outputHost = (T*)malloc(sizeDicom);
-    eee(cudaMemcpyFromArray(outputHost, d_arrayResult, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
-
-    // Cleanup
-    eee(cudaDestroySurfaceObject(d_surfDicom));
-    eee(cudaDestroySurfaceObject(d_surfResult));
-    eee(cudaFreeArray(d_arrayDicom));
-    eee(cudaFreeArray(d_arrayResult));
-
-    return outputHost;
-}
-
-template<typename T, cudaChannelFormatKind FK>
 __host__ T* modifySurfaceRasterized(int imageWidth, int imageHeight, T* h_dataDicom, unsigned char* h_dataPolyline)
 {
     size_t sizeDicom = imageWidth * imageHeight * sizeof(T);
@@ -406,5 +282,3 @@ template __host__ short* modifyTextureRasterized<short, cudaChannelFormatKindSig
 template __host__ unsigned short* modifyTextureRasterized<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);
 template __host__ short* modifySurfaceRasterized<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* dicomData, unsigned char* polylineData);
 template __host__ unsigned short* modifySurfaceRasterized<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* dicomData, unsigned char* polylineData);
-template __host__ short* convolveImage<short, cudaChannelFormatKindSigned>(int imageWidth, int imageHeight, short* textureData);
-template __host__ unsigned short* convolveImage<unsigned short, cudaChannelFormatKindUnsigned>(int imageWidth, int imageHeight, unsigned short* textureData);

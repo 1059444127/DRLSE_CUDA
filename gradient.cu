@@ -41,7 +41,7 @@ __global__ void sobelKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t outpu
         }
     }
 
-    surf2Dwrite(sumY,
+    surf2Dwrite(sqrt(sumX * sumX + sumY * sumY),
                 output, x * sizeof(float),
                 y,
                 cudaBoundaryModeClamp);

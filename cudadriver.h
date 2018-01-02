@@ -4,3 +4,4 @@
 #include <cuda_runtime.h>
 
 vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input);
+vtkSmartPointer<vtkImageData> testGaussianFilter(vtkImageData* input);

@@ -484,5 +484,15 @@ void MainWindow::on_actionTest_Sobel_filter_triggered()
 
 void MainWindow::on_actionTest_Gaussian_filter_triggered()
 {
+    //Get currently displayed imageData
+    auto dicomImageData = m_mainActor->GetInput();
 
+    //Apply our CUDA kernel to it
+    auto outputData = testGaussianFilter(dicomImageData);
+
+    //Display results
+    m_mainActor->GetMapper()->RemoveAllInputs();
+    m_mainActor->SetInputData(outputData);
+
+    this->ui->qvtkWidget->repaint();
 }

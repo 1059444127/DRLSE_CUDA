@@ -140,7 +140,7 @@ vtkSmartPointer<vtkImageData> testEdgeIndicator(vtkImageData* input)
     float* inputScalarPointer = static_cast<float*>(input->GetScalarPointer());
 
     //Execute kernel
-    float* outputScalarPointer = testEdgeIndicator(inputDims[0], inputDims[1], inputScalarPointer);
+    float* outputScalarPointer = applyEdgeIndicator(inputDims[0], inputDims[1], inputScalarPointer);
 
     // cudaDeviceReset must be called before exiting in order for profiling and
     // tracing tools such as Nsight and Visual Profiler to show complete traces.

@@ -70,6 +70,8 @@ class MainWindow : public QMainWindow
     void on_actionTest_Gaussian_filter_triggered();
     void on_actionTest_edge_indicator_triggered();
 
+    void on_actionNormalize_image_to_0_1_triggered();
+
 private:
     Ui::MainWindow *ui;
 

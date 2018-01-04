@@ -34,9 +34,6 @@ __global__ void edgeIndicatorKernel(cudaSurfaceObject_t gaussInput, cudaSurfaceO
         }
     }
 
-    sumX = sumX / 1000.0f;
-    sumY = sumY / 1000.0f;
-
     surf2Dwrite(1.0f / (1.0f + sumX * sumX + sumY * sumY),
                 output, x * sizeof(float),
                 y,

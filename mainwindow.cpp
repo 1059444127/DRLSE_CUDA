@@ -56,6 +56,7 @@
 #include <vtkAssemblyNode.h>
 #include <vtkAssemblyPath.h>
 #include <vtkImageCast.h>
+#include <vtkImageShiftScale.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -476,7 +477,6 @@ void MainWindow::on_actionTest_Sobel_filter_triggered()
     auto outputData = testSobelFilter(dicomImageData);
 
     //Display results
-    m_mainActor->GetMapper()->RemoveAllInputs();
     m_mainActor->SetInputData(outputData);
 
     this->ui->qvtkWidget->repaint();
@@ -491,7 +491,6 @@ void MainWindow::on_actionTest_Gaussian_filter_triggered()
     auto outputData = testGaussianFilter(dicomImageData);
 
     //Display results
-    m_mainActor->GetMapper()->RemoveAllInputs();
     m_mainActor->SetInputData(outputData);
 
     this->ui->qvtkWidget->repaint();
@@ -506,8 +505,31 @@ void MainWindow::on_actionTest_edge_indicator_triggered()
     auto outputData = testEdgeIndicator(dicomImageData);
 
     //Display results
-    m_mainActor->GetMapper()->RemoveAllInputs();
     m_mainActor->SetInputData(outputData);
+
+    this->ui->qvtkWidget->repaint();
+}
+
+void MainWindow::on_actionNormalize_image_to_0_1_triggered()
+{
+    //Get currently displayed imageData
+    auto dicomImageData = m_mainActor->GetInput();
+
+    auto scalarRangeLower = dicomImageData->GetScalarRange()[0];
+    auto scalarRangeUpper = dicomImageData->GetScalarRange()[1];
+
+    VTK_NEW(vtkImageShiftScale, shiftFilter);
+    shiftFilter->SetInputData(dicomImageData);
+    shiftFilter->SetShift(-1 * scalarRangeLower); //Shifts the range so the lower bound = 0
+    shiftFilter->SetScale(1.0f / (scalarRangeUpper - scalarRangeLower)); //Scales to range so the upper bound = 1
+    shiftFilter->Update();
+
+    m_mainActor->SetInputData(shiftFilter->GetOutput());
+
+    auto style = dynamic_cast<vtkInteractorStyleImage*>(m_renderer->GetRenderWindow()->GetInteractor()->GetInteractorStyle());
+    style->GetCurrentImageProperty()->SetColorWindow(1.0f);
+    style->GetCurrentImageProperty()->SetColorLevel(0.5f);
+    style->GetInteractor()->Render();
 
     this->ui->qvtkWidget->repaint();
 }

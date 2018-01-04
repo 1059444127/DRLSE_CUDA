@@ -6,18 +6,6 @@
 #include <gaussian.cuh>
 #include <common.cuh>
 
-__constant__ float d_identity[5*5] =   {0,   0,   0,   0,  0,
-                                        0,   0,   0,   0,  0,
-                                        0,   0,   1,   0,  0,
-                                        0,   0,   0,   0,  0,
-                                        0,   0,   0,   0,  0};
-
-__constant__ float d_gaussKernel3[3*3];
-__constant__ float d_gaussKernel5[5*5] = {0.003765f, 0.015019f, 0.023792f, 0.015019f, 0.003765f,
-                                          0.015019f, 0.059912f, 0.094907f, 0.059912f, 0.015019f,
-                                          0.023792f, 0.094907f, 0.150342f, 0.094907f, 0.023792f,
-                                          0.015019f, 0.059912f, 0.094907f, 0.059912f, 0.015019f,
-                                          0.003765f, 0.015019f, 0.023792f, 0.015019f, 0.003765f};
 
 __global__ void gaussianKernel(cudaSurfaceObject_t input, cudaSurfaceObject_t output)
 {

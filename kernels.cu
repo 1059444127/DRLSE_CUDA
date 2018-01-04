@@ -10,17 +10,6 @@
 //====================================================================================
 //KERNELS
 //====================================================================================
-__constant__ float d_sobelX[5*5] = {1,   2,   0,  -2,  -1,
-                                    4,   8,   0,  -8,  -4,
-                                    6,  12,   0, -12,  -6,
-                                    4,   8,   0,  -8,  -4,
-                                    1,   2,   0,  -2,  -1};
-
-__constant__ float d_sobelY[5*5] = {1,   4,   6,   4,   1,
-                                    2,   8,  12,   8,   2,
-                                    0,   0,   0,   0,   0,
-                                   -2,  -8, -12,  -8,  -2,
-                                   -1,  -4,  -6,  -4,  -1};
 
 __global__ void edgeIndicatorKernel(cudaSurfaceObject_t gaussInput, cudaSurfaceObject_t output)
 {
@@ -44,6 +33,9 @@ __global__ void edgeIndicatorKernel(cudaSurfaceObject_t gaussInput, cudaSurfaceO
             sumY += sample * d_sobelY[index];
         }
     }
+
+    sumX = sumX / 1000.0f;
+    sumY = sumY / 1000.0f;
 
     surf2Dwrite(1.0f / (1.0f + sumX * sumX + sumY * sumY),
                 output, x * sizeof(float),

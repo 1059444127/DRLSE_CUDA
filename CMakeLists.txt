@@ -28,15 +28,16 @@ set(HEADERS
     )
 
 set(KERNELS_SOURCES
+    common.cu
     kernels.cu
     gradient.cu
     gaussian.cu
     )
 
 set(KERNELS_HEADERS
+    common.cuh
     kernels.cuh
     gradient.cuh
-    common.cuh
     gaussian.cuh
     )
 

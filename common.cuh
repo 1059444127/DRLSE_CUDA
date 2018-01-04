@@ -9,6 +9,8 @@ extern __constant__ float d_sobelY[5*5];
 extern __constant__ float d_identity[5*5];
 extern __constant__ float d_gaussKernel3[3*3];
 extern __constant__ float d_gaussKernel5[5*5];
+extern __constant__ float d_laplace3[3*3];
+extern __constant__ float d_laplace5[5*5];
 
 #define eee(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)

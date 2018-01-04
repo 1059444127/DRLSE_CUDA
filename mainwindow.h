@@ -72,6 +72,8 @@ class MainWindow : public QMainWindow
 
     void on_actionNormalize_image_to_0_1_triggered();
 
+    void on_actionFill_rasterized_polylines_triggered();
+
 private:
     Ui::MainWindow *ui;
 

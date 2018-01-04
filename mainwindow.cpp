@@ -351,6 +351,7 @@ void MainWindow::on_actionCreate_polyline_triggered()
     tracer->SetProjectionNormalToZAxes();
     tracer->SetProjectionPosition(1);
     tracer->SetAutoClose(1);
+    tracer->SetCaptureRadius(1000000); //Always close the polyline
     tracer->On();
 
     //Keep track of this polyline (easiest way of cleaning it later)
@@ -468,6 +469,51 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     on_actionClear_polylines_triggered();
 }
 
+void MainWindow::on_actionFill_rasterized_polylines_triggered()
+{
+    auto rastConts = m_polyLineActor->GetInput();
+    int* dims = rastConts->GetDimensions();
+
+    VTK_NEW(vtkImageData, rastFilled);
+    rastFilled->DeepCopy(rastConts);
+
+    unsigned char* pixelsCont = static_cast<unsigned char*>(rastConts->GetScalarPointer(0, 0, 0));
+    unsigned char* pixelsFill = static_cast<unsigned char*>(rastFilled->GetScalarPointer(0, 0, 0));
+
+    for (int y = 0; y < dims[1]; y++)
+    {
+        bool inside = false;
+        unsigned char lastChar = 0;
+
+        for (int x = 0; x < dims[0]; x++)
+        {
+            int index = y * dims[0] + x;
+            auto pixCont = pixelsCont[index];
+
+            //Hit a transition and we didn't hit a transition last pixel
+            //This is important when scanning through horizontal lines for example
+            if(pixCont == 255 && lastChar != 255)
+            {
+                inside = !inside;
+            }
+
+            pixelsFill[index] = inside ? 255 : 0;
+            lastChar = pixCont;
+        }
+    }
+
+    m_polyLineActor->SetInputData(rastFilled);
+
+    this->ui->qvtkWidget->repaint();
+
+    //Sweep the image, row by row
+    //Sweep the image, left to right
+    //Start outside, paint pixel as out
+    //As you walk through, see if we have a value transition (rasterized polylines are binary images)
+    //After a transition, start marking pixels as in (after a pixel)
+    //After the next transition, start marking pixels as out (right on the transition)
+}
+
 void MainWindow::on_actionTest_Sobel_filter_triggered()
 {
     //Get currently displayed imageData
@@ -533,3 +579,5 @@ void MainWindow::on_actionNormalize_image_to_0_1_triggered()
 
     this->ui->qvtkWidget->repaint();
 }
+
+

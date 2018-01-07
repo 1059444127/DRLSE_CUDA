@@ -340,7 +340,7 @@ void MainWindow::on_actionCreate_polyline_triggered()
     for(int i = 0; i < m_polylines.size(); i++)
     {
         vtkImageTracerWidget* widget = m_polylines[i];
-        widget->InteractionOff();
+        widget->InteractionOff();        
     }
 
     auto interactor = m_renderer->GetRenderWindow()->GetInteractor();
@@ -430,11 +430,11 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     whiteImage->SetSpacing(spacing);
     whiteImage->SetOrigin(origin);
     whiteImage->SetExtent(extent);
-    whiteImage->AllocateScalars(VTK_UNSIGNED_CHAR,1);
+    whiteImage->AllocateScalars(VTK_CHAR,1);
 
     // fill the image with foreground voxels:
-    unsigned char inval = 255;
-    unsigned char outval = 0;
+    char inval = -2;
+    char outval = 2;
     vtkIdType count = whiteImage->GetNumberOfPoints();
     for (vtkIdType i = 0; i < count; ++i)
     {
@@ -539,4 +539,16 @@ void MainWindow::on_actionNormalize_image_to_0_1_triggered()
     this->ui->qvtkWidget->repaint();
 }
 
+void MainWindow::on_actionTest_level_sets_triggered()
+{
+    auto dicomImageData = m_mainActor->GetInput();
+    auto polyLineData = m_polyLineActor->GetInput();
 
+    //Apply our CUDA kernel to it
+    //auto levelSetData = initLevelSets(dicomImageData, polyLineData);
+
+    //Display results
+    //m_mainActor->SetInputData(outputData);
+
+    this->ui->qvtkWidget->repaint();
+}

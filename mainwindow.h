@@ -71,6 +71,8 @@ class MainWindow : public QMainWindow
     void on_actionTest_edge_indicator_triggered();
     void on_actionNormalize_image_to_0_1_triggered();
 
+    void on_actionTest_level_sets_triggered();
+
 private:
     Ui::MainWindow *ui;
 

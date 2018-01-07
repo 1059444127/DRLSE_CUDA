@@ -12,13 +12,30 @@
 
 #include <cuda_runtime.h>
 
-#include <cudadriver.h>
-#include <kernels.cuh>
-#include <gradient.cuh>
-#include <gaussian.cuh>
+#include "cudadriver.h"
+#include "kernels.cuh"
+#include "gradient.cuh"
+#include "gaussian.cuh"
 
 //Makes these long declarations a little more readable
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
+
+
+struct LevelSetData
+{
+    float c0 = 2;
+    float timestep = 1;
+    float mu = 0.2 / 1;
+    float lambda = 5;
+    float alpha = -3;
+    float epsilon = 1.5;
+    unsigned int maxIterCount = 100;
+    cudaSurfaceObject_t phi;
+};
+
+static LevelSetData testData;
+static cudaSurfaceObject_t edgeIndicator;
+static cudaSurfaceObject_t edgeIndicatorGrad;
 
 
 vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
@@ -163,4 +180,14 @@ vtkSmartPointer<vtkImageData> testEdgeIndicator(vtkImageData* input)
     outputImage->GetPointData()->SetScalars(outputArr);
 
     return outputImage;
+}
+
+void initLevelSets(vtkImageData* imageInput, vtkImageData* polylineInput)
+{
+
+}
+
+vtkSmartPointer<vtkImageData> iterateLevelSets(unsigned int numIters)
+{
+    return nullptr;
 }

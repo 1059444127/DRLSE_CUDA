@@ -85,7 +85,6 @@
     <addaction name="actionCreate_polyline"/>
     <addaction name="actionClear_polylines"/>
     <addaction name="actionRasterize_polylines"/>
-    <addaction name="actionFill_rasterized_polylines"/>
     <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuTests">
@@ -174,11 +173,6 @@
   <action name="actionNormalize_image_to_0_1">
    <property name="text">
     <string>Normalize image to [0,1]</string>
-   </property>
-  </action>
-  <action name="actionFill_rasterized_polylines">
-   <property name="text">
-    <string>Fill rasterized polylines</string>
    </property>
   </action>
  </widget>

@@ -57,6 +57,7 @@
 #include <vtkAssemblyPath.h>
 #include <vtkImageCast.h>
 #include <vtkImageShiftScale.h>
+#include <vtkContourTriangulator.h>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -386,7 +387,7 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     appendFilter->Update();
 
     //Translate polydata down in the Z direction so it sits on top of the
-    //main image. Its usually 1 unit ahead of it so we can see it on top of the image
+    //main image. Its usually 1 unit ahead of it so we can see the polylines in front of the image
     VTK_NEW(vtkTransform, trans);
     trans->Translate(0, 0, -1);
 
@@ -395,15 +396,20 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     transFilter->SetTransform(trans);
     transFilter->Update();
 
-    VTK_NEW(vtkTubeFilter, tube);
-    tube->SetInputData(transFilter->GetOutput());
-    tube->SetRadius(0.3);
-    tube->SetNumberOfSides(6);
-    tube->CappingOn();
-    tube->Update();
+    VTK_NEW(vtkContourTriangulator, triFilter);
+    triFilter->SetInputData(transFilter->GetOutput());
+    triFilter->Update();
+
+    VTK_NEW(vtkLinearExtrusionFilter, extrusion);
+    extrusion->SetInputData(triFilter->GetOutput());
+    extrusion->SetCapping(1);
+    extrusion->SetScaleFactor(1);
+    extrusion->SetExtrusionTypeToNormalExtrusion();
+    extrusion->SetVector(0, 0, 1);
+    extrusion->Update();
 
     VTK_NEW(vtkPolyDataMapper, mapper);
-    mapper->SetInputData(tube->GetOutput());
+    mapper->SetInputData(extrusion->GetOutput());
 
     VTK_NEW(vtkActor, polyActor);
     polyActor->SetMapper(mapper);
@@ -436,7 +442,7 @@ void MainWindow::on_actionRasterize_polylines_triggered()
 
     // polygonal data --> image stencil:
     VTK_NEW(vtkPolyDataToImageStencil, pol2stenc);
-    pol2stenc->SetInputData(tube->GetOutput());
+    pol2stenc->SetInputData(extrusion->GetOutput());
     pol2stenc->SetOutputOrigin(origin);
     pol2stenc->SetOutputSpacing(spacing);
     pol2stenc->SetOutputWholeExtent(whiteImage->GetExtent());
@@ -467,51 +473,6 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     this->ui->qvtkWidget->repaint();
 
     on_actionClear_polylines_triggered();
-}
-
-void MainWindow::on_actionFill_rasterized_polylines_triggered()
-{
-    auto rastConts = m_polyLineActor->GetInput();
-    int* dims = rastConts->GetDimensions();
-
-    VTK_NEW(vtkImageData, rastFilled);
-    rastFilled->DeepCopy(rastConts);
-
-    unsigned char* pixelsCont = static_cast<unsigned char*>(rastConts->GetScalarPointer(0, 0, 0));
-    unsigned char* pixelsFill = static_cast<unsigned char*>(rastFilled->GetScalarPointer(0, 0, 0));
-
-    for (int y = 0; y < dims[1]; y++)
-    {
-        bool inside = false;
-        unsigned char lastChar = 0;
-
-        for (int x = 0; x < dims[0]; x++)
-        {
-            int index = y * dims[0] + x;
-            auto pixCont = pixelsCont[index];
-
-            //Hit a transition and we didn't hit a transition last pixel
-            //This is important when scanning through horizontal lines for example
-            if(pixCont == 255 && lastChar != 255)
-            {
-                inside = !inside;
-            }
-
-            pixelsFill[index] = inside ? 255 : 0;
-            lastChar = pixCont;
-        }
-    }
-
-    m_polyLineActor->SetInputData(rastFilled);
-
-    this->ui->qvtkWidget->repaint();
-
-    //Sweep the image, row by row
-    //Sweep the image, left to right
-    //Start outside, paint pixel as out
-    //As you walk through, see if we have a value transition (rasterized polylines are binary images)
-    //After a transition, start marking pixels as in (after a pixel)
-    //After the next transition, start marking pixels as out (right on the transition)
 }
 
 void MainWindow::on_actionTest_Sobel_filter_triggered()

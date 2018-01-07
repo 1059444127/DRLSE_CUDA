@@ -100,7 +100,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     {
         //We need to kill the interactor or else it will keep the event loop alive
         auto inter = m_renderer->GetRenderWindow()->GetInteractor();
-        inter->GetRenderWindow()->Finalize();
+        auto ren = inter->GetRenderWindow();
+        ren->Finalize();
         inter->TerminateApp();
     }
     catch(...)
@@ -346,7 +347,7 @@ void MainWindow::on_actionCreate_polyline_triggered()
 
     VTK_NEW(vtkImageTracerWidget, tracer);
     tracer->GetLineProperty()->SetLineWidth(2);
-    tracer->SetInteractor(interactor);
+    tracer->SetInteractor(interactor);    
     tracer->SetViewProp(m_mainActor);
     tracer->SetProjectToPlane(1); //place widget lines 1 unit in front of the main image plane
     tracer->SetProjectionNormalToZAxes();
@@ -359,16 +360,16 @@ void MainWindow::on_actionCreate_polyline_triggered()
     m_polylines.push_back(tracer);
 
     this->ui->qvtkWidget->repaint();
-    interactor->Start();
 }
 
 void MainWindow::on_actionClear_polylines_triggered()
 {
     for(int i = 0; i < m_polylines.size(); i++)
     {
-        auto widget = m_polylines[i];
+        vtkSmartPointer<vtkImageTracerWidget> widget = m_polylines[i];
         widget->Off();
     }
+
     m_polylines.clear();
     this->ui->qvtkWidget->repaint();
 }
@@ -461,9 +462,6 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     m_polyLineActor->GetProperty()->SetInterpolationTypeToNearest();
     m_polyLineActor->GetMapper()->BackgroundOff();
     m_polyLineActor->SetOpacity(0.5);
-
-    m_mainActor->GetInput()->Print(cout);
-    whiteImage->Print(cout);
 
     //m_renderer->RemoveAllViewProps();
     m_renderer->AddActor(m_polyLineActor);

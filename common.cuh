@@ -21,3 +21,36 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
       if (abort) exit(code);
    }
 }
+
+class CUDASurface
+{
+public:
+    cudaSurfaceObject_t surface;
+    cudaResourceDesc surfDesc;
+    cudaArray* arr;
+    cudaChannelFormatDesc arrDesc;
+
+    CUDASurface(const void* h_src, unsigned int width, unsigned int height, const cudaChannelFormatDesc& desc)
+    {
+        //Array description and memcpy
+        arrDesc = desc;
+        eee(cudaMallocArray(&arr, &arrDesc, width, height));
+        if(h_src != NULL)
+            eee(cudaMemcpyToArray(arr, 0, 0, h_src, width * height * ((desc.x / 8) + (desc.y / 8) + (desc.z / 8) + (desc.w / 8)), cudaMemcpyHostToDevice));
+
+        //Surface description
+        memset(&surfDesc, 0, sizeof(surfDesc));
+        surfDesc.resType = cudaResourceTypeArray;
+        surfDesc.res.array.array = arr;
+
+        //Surface object
+        memset(&surface, 0, sizeof(surface));
+        eee(cudaCreateSurfaceObject(&surface, &surfDesc));
+    }
+
+    ~CUDASurface()
+    {
+        eee(cudaDestroySurfaceObject(surface));
+        eee(cudaFreeArray(arr));
+    }
+};

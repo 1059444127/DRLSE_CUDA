@@ -5,7 +5,7 @@ project(DRLSE_CUDA LANGUAGES CXX CUDA)
 find_package(Qt5Widgets)
 
 # VTK
-set(VTK_DIR "C:/Users/Daniel/Dropbox/C++/Resources/VTK-8.0.1-build/" CACHE PATH directory FORCE)
+set(VTK_DIR "E:/VTK/" CACHE PATH directory FORCE)
 find_package(VTK REQUIRED)
 include(${VTK_USE_FILE})
 #message(${VTK_LIBRARIES})

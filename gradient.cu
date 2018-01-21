@@ -118,7 +118,6 @@ __host__ float* applySobelFilter(int imageWidth, int imageHeight, float* h_dataD
     eee(cudaDestroySurfaceObject(d_surfResult));
     eee(cudaFreeArray(d_arrayDicom));
     eee(cudaFreeArray(d_arrayResult));
-    eee(cudaDeviceReset());
 
     return outputHost;
 }

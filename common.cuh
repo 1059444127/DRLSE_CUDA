@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 
 #include <stdio.h>
+#include <string>
 
 //Convolution kernels defined in common.cu
 extern __constant__ float d_sobelX[5*5];
@@ -25,10 +26,12 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 class CUDASurface
 {
 public:
+    std::string name;
+
     cudaSurfaceObject_t surface;
     cudaResourceDesc surfDesc;
     cudaArray* arr;
-    cudaChannelFormatDesc arrDesc;
+    cudaChannelFormatDesc arrDesc;    
 
     CUDASurface(const void* h_src, unsigned int width, unsigned int height, const cudaChannelFormatDesc& desc)
     {

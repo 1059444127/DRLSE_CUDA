@@ -83,7 +83,6 @@ __host__ float* applyGaussianFilter(int imageWidth, int imageHeight, float* h_da
     eee(cudaDestroySurfaceObject(d_surfResult));
     eee(cudaFreeArray(d_arrayDicom));
     eee(cudaFreeArray(d_arrayResult));
-    eee(cudaDeviceReset());
 
     return outputHost;
 }

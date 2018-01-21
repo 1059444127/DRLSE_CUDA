@@ -49,38 +49,37 @@ __global__ void edgeIndicatorKernel(cudaSurfaceObject_t gaussInput, cudaSurfaceO
 //====================================================================================
 
 //Forward declarations
-__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom);
+__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface* out_edgeSurf, CUDASurface* out_edgeGradSurf);
 
 
 __host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom)
 {
     size_t sizeDicom = imageWidth * imageHeight * sizeof(float);
 
-    // Run the kernel, generating edge indicator and its gradient as surfaces
-    shared_ptr<CUDASurface> edge, edgeGrad;
-    edgeIndicator(imageWidth, imageHeight, h_dataDicom, edge.get(), edgeGrad.get());
+    cudaChannelFormatDesc channelFormatEdge = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+    cudaChannelFormatDesc channelFormatEdgeGrad = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
+    auto edgeSurf = CUDASurface(nullptr, imageWidth, imageHeight, channelFormatEdge);
+    auto edgeGradSurf = CUDASurface(nullptr, imageWidth, imageHeight, channelFormatEdgeGrad);
+    edgeSurf.name = "edgeSurf";
+    edgeGradSurf.name = "edgeGradSurf";
+
+    edgeIndicator(imageWidth, imageHeight, h_dataDicom, &edgeSurf, &edgeGradSurf);
 
     // Copy results to host memory
     float* h_output = (float*)malloc(sizeDicom);
-    eee(cudaMemcpyFromArray(h_output, edge->arr, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
-
-    // Cleanup
-    eee(cudaDeviceReset());
+    eee(cudaMemcpyFromArray(h_output, edgeSurf.arr, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
 
     return h_output;
 }
 
-__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom)
+__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface *out_edgeSurf, CUDASurface *out_edgeGradSurf)
 {
     cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaChannelFormatDesc channelFormatGauss = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-    cudaChannelFormatDesc channelFormatEdge = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-    cudaChannelFormatDesc channelFormatEdgeGrad = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
-
     auto dicomSurf = CUDASurface(h_dataDicom, imageWidth, imageHeight, channelFormatDicom);
     auto gaussSurf = CUDASurface(nullptr, imageWidth, imageHeight, channelFormatGauss);
-    out_edgeSurf = new CUDASurface(nullptr, imageWidth, imageHeight, channelFormatEdge);
-    out_edgeGradSurf = new CUDASurface(nullptr, imageWidth, imageHeight, channelFormatEdgeGrad);
+    dicomSurf.name = "dicomSurf";
+    gaussSurf.name = "gaussSurf";
 
     dim3 block(imageWidth / 16, imageHeight / 16,1);
     dim3 grid(16,16,1);
@@ -100,7 +99,4 @@ __host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom)
     // can be confusing
     eee(cudaPeekAtLastError());
     eee(cudaDeviceSynchronize());
-
-    // Cleanup    
-    eee(cudaDeviceReset());
 }

@@ -49,10 +49,10 @@ __global__ void edgeIndicatorKernel(cudaSurfaceObject_t gaussInput, cudaSurfaceO
 //====================================================================================
 
 //Forward declarations
-__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface* out_edgeSurf, CUDASurface* out_edgeGradSurf);
+__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface* edgeSurf, CUDASurface* edgeGradSurf);
 
 
-__host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom)
+__host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dicomData)
 {
     size_t sizeDicom = imageWidth * imageHeight * sizeof(float);
 
@@ -63,7 +63,7 @@ __host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dat
     edgeSurf.name = "edgeSurf";
     edgeGradSurf.name = "edgeGradSurf";
 
-    edgeIndicator(imageWidth, imageHeight, h_dataDicom, &edgeSurf, &edgeGradSurf);
+    edgeIndicator(imageWidth, imageHeight, h_dicomData, &edgeSurf, &edgeGradSurf);
 
     // Copy results to host memory
     float* h_output = (float*)malloc(sizeDicom);
@@ -72,7 +72,7 @@ __host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dat
     return h_output;
 }
 
-__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface *out_edgeSurf, CUDASurface *out_edgeGradSurf)
+__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface *edgeSurf, CUDASurface *edgeGradSurf)
 {
     cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaChannelFormatDesc channelFormatGauss = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
@@ -88,10 +88,10 @@ __host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom,
     gaussianKernel<<<grid, block>>>(dicomSurf.surface, gaussSurf.surface);
 
     // Run edge indicator kernel
-    edgeIndicatorKernel<<<grid, block>>>(gaussSurf.surface, out_edgeSurf->surface);
+    edgeIndicatorKernel<<<grid, block>>>(gaussSurf.surface, edgeSurf->surface);
 
     // Also get the gradient of the edge indicator result
-    sobelKernel<<<grid, block>>>(out_edgeSurf->surface, out_edgeGradSurf->surface);
+    sobelKernel<<<grid, block>>>(edgeSurf->surface, edgeGradSurf->surface);
 
 
     // The synchronize call will force the host to wait for the kernel to finish. If we don't

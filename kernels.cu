@@ -49,7 +49,7 @@ __global__ void edgeIndicatorKernel(cudaSurfaceObject_t gaussInput, cudaSurfaceO
 //====================================================================================
 
 //Forward declarations
-__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface* edgeSurf, CUDASurface* edgeGradSurf);
+__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface* out_edgeSurf, CUDASurface* out_edgeGradSurf);
 
 
 __host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dicomData)
@@ -72,7 +72,7 @@ __host__ float* applyEdgeIndicator(int imageWidth, int imageHeight, float* h_dic
     return h_output;
 }
 
-__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface *edgeSurf, CUDASurface *edgeGradSurf)
+__host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom, CUDASurface *out_edgeSurf, CUDASurface *out_edgeGradSurf)
 {
     cudaChannelFormatDesc channelFormatDicom = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaChannelFormatDesc channelFormatGauss = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
@@ -88,11 +88,34 @@ __host__ void edgeIndicator(int imageWidth, int imageHeight, float* h_dataDicom,
     gaussianKernel<<<grid, block>>>(dicomSurf.surface, gaussSurf.surface);
 
     // Run edge indicator kernel
-    edgeIndicatorKernel<<<grid, block>>>(gaussSurf.surface, edgeSurf->surface);
+    edgeIndicatorKernel<<<grid, block>>>(gaussSurf.surface, out_edgeSurf->surface);
 
     // Also get the gradient of the edge indicator result
-    sobelKernel<<<grid, block>>>(edgeSurf->surface, edgeGradSurf->surface);
+    sobelKernel<<<grid, block>>>(out_edgeSurf->surface, out_edgeGradSurf->surface);
 
+
+    // The synchronize call will force the host to wait for the kernel to finish. If we don't
+    // do this, we might get errors on future checks, but that indicate errors in the kernel, which
+    // can be confusing
+    eee(cudaPeekAtLastError());
+    eee(cudaDeviceSynchronize());
+}
+
+__host__ void initLevelSetData(int imageWidth, int imageHeight, float* h_dicomData, float* h_polylineData, LevelSetData* out_levelSetData)
+{
+    cudaChannelFormatDesc channelFormatPhi = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+    out_levelSetData->phi = std::make_unique<CUDASurface>(h_polylineData, imageWidth, imageHeight, channelFormatPhi);
+    out_levelSetData->phi->name = "phiSurf";
+
+    cudaChannelFormatDesc channelFormatEdge = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+    out_levelSetData->edge = std::make_unique<CUDASurface>(nullptr, imageWidth, imageHeight, channelFormatEdge);
+    out_levelSetData->edge->name = "edgeSurf";
+
+    cudaChannelFormatDesc channelFormatEdgeGrad = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
+    out_levelSetData->edgeGrad = std::make_unique<CUDASurface>(nullptr, imageWidth, imageHeight, channelFormatEdgeGrad);
+    out_levelSetData->edgeGrad->name = "edgeGradSurf";
+
+    edgeIndicator(imageWidth, imageHeight, h_dicomData, out_levelSetData->edge.get(), out_levelSetData->edgeGrad.get());
 
     // The synchronize call will force the host to wait for the kernel to finish. If we don't
     // do this, we might get errors on future checks, but that indicate errors in the kernel, which

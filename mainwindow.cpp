@@ -409,11 +409,11 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     extrusion->SetVector(0, 0, 1);
     extrusion->Update();
 
-    VTK_NEW(vtkPolyDataMapper, mapper);
-    mapper->SetInputData(extrusion->GetOutput());
+//    VTK_NEW(vtkPolyDataMapper, mapper);
+//    mapper->SetInputData(extrusion->GetOutput());
 
-    VTK_NEW(vtkActor, polyActor);
-    polyActor->SetMapper(mapper);
+//    VTK_NEW(vtkActor, polyActor);
+//    polyActor->SetMapper(mapper);
 
     VTK_NEW(vtkImageData, whiteImage);
     double spacing[3];
@@ -430,11 +430,11 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     whiteImage->SetSpacing(spacing);
     whiteImage->SetOrigin(origin);
     whiteImage->SetExtent(extent);
-    whiteImage->AllocateScalars(VTK_CHAR,1);
+    whiteImage->AllocateScalars(VTK_FLOAT,1);
 
     // fill the image with foreground voxels:
-    char inval = -2;
-    char outval = 2;
+    float inval = -2.0f;
+    float outval = 2.0f;
     vtkIdType count = whiteImage->GetNumberOfPoints();
     for (vtkIdType i = 0; i < count; ++i)
     {
@@ -461,10 +461,10 @@ void MainWindow::on_actionRasterize_polylines_triggered()
     m_polyLineActor->SetInputData(imgstenc->GetOutput());
     m_polyLineActor->GetProperty()->SetInterpolationTypeToNearest();
     m_polyLineActor->GetMapper()->BackgroundOff();
-    m_polyLineActor->SetOpacity(0.5);
+    //m_polyLineActor->SetOpacity(0.5);
 
     //m_renderer->RemoveAllViewProps();
-    m_renderer->AddActor(m_polyLineActor);
+    //m_renderer->AddActor(m_polyLineActor);
     //m_renderer->AddActor(polyActor);
     //m_renderer->ResetCamera();
 
@@ -544,10 +544,5 @@ void MainWindow::on_actionTest_level_sets_triggered()
     auto polyLineData = m_polyLineActor->GetInput();
 
     //Apply our CUDA kernel to it
-    //auto levelSetData = initLevelSets(dicomImageData, polyLineData);
-
-    //Display results
-    //m_mainActor->SetInputData(outputData);
-
-    this->ui->qvtkWidget->repaint();
+    initLevelSets(dicomImageData, polyLineData);
 }

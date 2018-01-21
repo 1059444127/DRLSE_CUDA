@@ -1,8 +1,11 @@
+#pragma once
+
 #include <device_launch_parameters.h>
 #include <cuda_runtime.h>
 
 #include <stdio.h>
 #include <string>
+#include <memory>
 
 //Convolution kernels defined in common.cu
 extern __constant__ float d_sobelX[5*5];
@@ -56,4 +59,18 @@ public:
         eee(cudaDestroySurfaceObject(surface));
         eee(cudaFreeArray(arr));
     }
+};
+
+struct LevelSetData
+{
+    float c0 = 2;
+    float timestep = 1;
+    float mu = 0.2f / 1;
+    float lambda = 5;
+    float alpha = -3;
+    float epsilon = 1.5;
+    unsigned int maxIterCount = 100;
+    std::unique_ptr<CUDASurface> phi;
+    std::unique_ptr<CUDASurface> edge;
+    std::unique_ptr<CUDASurface> edgeGrad;
 };

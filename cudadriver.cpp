@@ -16,26 +16,11 @@
 #include "kernels.cuh"
 #include "gradient.cuh"
 #include "gaussian.cuh"
+#include "common.cuh"
 
 //Makes these long declarations a little more readable
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
 
-
-struct LevelSetData
-{
-    float c0 = 2;
-    float timestep = 1;
-    float mu = 0.2 / 1;
-    float lambda = 5;
-    float alpha = -3;
-    float epsilon = 1.5;
-    unsigned int maxIterCount = 100;
-    cudaSurfaceObject_t phi;
-};
-
-static LevelSetData testData;
-static cudaSurfaceObject_t edgeIndicator;
-static cudaSurfaceObject_t edgeIndicatorGrad;
 
 
 vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
@@ -190,9 +175,38 @@ vtkSmartPointer<vtkImageData> testEdgeIndicator(vtkImageData* input)
     return outputImage;
 }
 
-void initLevelSets(vtkImageData* imageInput, vtkImageData* polylineInput)
+void initLevelSets(vtkImageData* dicomInput, vtkImageData* polylineInput)
 {
+    int* inputDims = dicomInput->GetDimensions();
 
+    //Copy input spatial info into a result image
+    VTK_NEW(vtkImageData, outputImage);
+    double spacing[3];
+    int dim[3];
+    double origin[3];
+    int extent[6];
+    dicomInput->GetSpacing(spacing);
+    dicomInput->GetDimensions(dim);
+    dicomInput->GetOrigin(origin);
+    dicomInput->GetExtent(extent);
+    outputImage->SetDimensions(dim);
+    outputImage->SetSpacing(spacing);
+    outputImage->SetOrigin(origin);
+    outputImage->SetExtent(extent);
+
+    //Get pointer to input data
+    float* h_dicomData = static_cast<float*>(dicomInput->GetScalarPointer());
+    float* h_polylineData = static_cast<float*>(polylineInput->GetScalarPointer());
+
+    LevelSetData lsd;
+    initLevelSetData(inputDims[0], inputDims[1], h_dicomData, h_polylineData, &lsd);
+
+    // cudaDeviceReset must be called before exiting in order for profiling and
+    // tracing tools such as Nsight and Visual Profiler to show complete traces.
+    cudaError_t cudaStatus = cudaDeviceReset();
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaDeviceReset failed!");
+    }
 }
 
 vtkSmartPointer<vtkImageData> iterateLevelSets(unsigned int numIters)

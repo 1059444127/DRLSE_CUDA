@@ -59,7 +59,7 @@ __host__ float* applySobelFilter(int imageWidth, int imageHeight, float* h_dicom
 
     // Copy results to host
     float* h_gradData = (float*)malloc(sizeDicom * 2);
-    eee(cudaMemcpyFromArray(h_gradData, gradSurf.arr, 0, 0, sizeDicom, cudaMemcpyDeviceToHost));
+    eee(cudaMemcpyFromArray(h_gradData, gradSurf.arr, 0, 0, sizeDicom * 2, cudaMemcpyDeviceToHost));
 
     return h_gradData;
 }

@@ -57,6 +57,11 @@ vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
     outputImage->SetOrigin(origin);
     outputImage->SetExtent(extent);
 
+    auto outInfo = outputImage->GetInformation();
+    vtkImageData::SetScalarType(VTK_FLOAT, outInfo);
+    vtkImageData::SetNumberOfScalarComponents(3, outInfo);
+    outputImage->AllocateScalars(outInfo);
+
     //Get pointer to input data
     float* inputScalarPointer = static_cast<float*>(input->GetScalarPointer());
 
@@ -71,17 +76,20 @@ vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
         return nullptr;
     }
 
-    //Insert results into a vtk array
-    VTK_NEW(vtkFloatArray, outputArr);
-    outputArr->SetNumberOfComponents(1);
-    outputArr->SetArray(outputScalarPointer, inputDims[0] * inputDims[1], 1); //last 1 to take ownership of outputScalarPointer, will use its memory
+    // Split interlaced channels into separate RGB channels
+    unsigned int width = inputDims[1];
+    unsigned int numPixels = inputDims[0] * width;
+    for(unsigned int i = 0; i < numPixels; i++)
+    {
+        auto red   = outputScalarPointer[i*2];
+        auto green = outputScalarPointer[i*2 + 1];
+        auto blue  = 0.0f;
 
-    //Insert vtk array into result image
-    auto outInfo = outputImage->GetInformation();
-    vtkImageData::SetScalarType(VTK_FLOAT, outInfo);
-    vtkImageData::SetNumberOfScalarComponents(1, outInfo);
-    outputImage->SetInformation(outInfo);
-    outputImage->GetPointData()->SetScalars(outputArr);
+        outputImage->SetScalarComponentFromFloat(i % width, i / width, 0, 0, std::abs(red));
+        outputImage->SetScalarComponentFromFloat(i % width, i / width, 0, 1, std::abs(green));
+        outputImage->SetScalarComponentFromFloat(i % width, i / width, 0, 2, std::abs(blue));
+    }
+    free(outputScalarPointer);
 
     return outputImage;
 }

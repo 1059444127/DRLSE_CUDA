@@ -200,7 +200,7 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
     cornerAnn->SetText(0, fullMessage.c_str());
 
     //Get current windowing info, and add text on bottom right with WW and WC
-    auto imageProperty = style->GetCurrentImageProperty();
+    auto imageProperty = MainWindow::instance->GetActor()->GetProperty();
     if(imageProperty != nullptr)
     {
         auto window = imageProperty->GetColorWindow();
@@ -264,7 +264,7 @@ void MainWindow::on_actionOpenFile_triggered()
         m_renderer->AddActor(m_mainActor);
         m_renderer->AddViewProp(m_cornerAnn);
         m_renderer->GetActiveCamera()->SetParallelProjection(1);
-        m_renderer->ResetCamera();
+        m_renderer->ResetCamera();        
 
         interactor->Initialize();
         interactor->Start();
@@ -523,18 +523,17 @@ void MainWindow::on_actionNormalize_image_to_0_1_triggered()
     auto scalarRangeLower = dicomImageData->GetScalarRange()[0];
     auto scalarRangeUpper = dicomImageData->GetScalarRange()[1];
 
+    //Shift the image data to the [0,1] range
     VTK_NEW(vtkImageShiftScale, shiftFilter);
     shiftFilter->SetInputData(dicomImageData);
     shiftFilter->SetShift(-1 * scalarRangeLower); //Shifts the range so the lower bound = 0
     shiftFilter->SetScale(1.0f / (scalarRangeUpper - scalarRangeLower)); //Scales to range so the upper bound = 1
     shiftFilter->Update();
 
+    //Shift our mapper window width/center to perfectly fit the [0,1] range
     m_mainActor->SetInputData(shiftFilter->GetOutput());
-
-    auto style = dynamic_cast<vtkInteractorStyleImage*>(m_renderer->GetRenderWindow()->GetInteractor()->GetInteractorStyle());
-    style->GetCurrentImageProperty()->SetColorWindow(1.0f);
-    style->GetCurrentImageProperty()->SetColorLevel(0.5f);
-    style->GetInteractor()->Render();
+    m_mainActor->GetProperty()->SetColorWindow(1.0f);
+    m_mainActor->GetProperty()->SetColorLevel(0.5f);
 
     this->ui->qvtkWidget->repaint();
 }

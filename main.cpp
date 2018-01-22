@@ -12,8 +12,7 @@ int main(int argc, char** argv)
     //QApplication::setStyle("Cleanlooks");
     QApplication a(argc, argv);
 
-    MainWindow w;
-    w.show();
+    MainWindow::GetInstance().show();
 
     a.connect(&a, SIGNAL(lastWindowClosed()), &a, SLOT(quit()));
 

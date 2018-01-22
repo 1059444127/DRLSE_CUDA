@@ -43,16 +43,19 @@ class MainWindow : public QMainWindow
     //Also possible to query a slot's parameter types and invoke it
     Q_OBJECT
 
-    public:
-    MainWindow();
-    ~MainWindow(){};
+public:
+    static MainWindow& GetInstance()
+    {
+        static MainWindow instance;
+        return instance;
+    }
+
+    MainWindow(MainWindow const&) = delete;
+    void operator=(MainWindow const&) = delete;
+    ~MainWindow(){}
 
     void closeEvent(QCloseEvent *event) override;
-
-    static MainWindow* instance;
-
     void ShowStatus(std::string message);
-
     vtkImageActor* GetActor() {return m_mainActor.GetPointer();}
     vtkRenderer* GetRenderer() {return m_renderer.GetPointer();}
     vtkPropPicker* GetPicker() {return m_picker.GetPointer();}
@@ -74,6 +77,8 @@ class MainWindow : public QMainWindow
     void on_actionTest_level_sets_triggered();
 
 private:
+    MainWindow();
+
     Ui::MainWindow *ui;
 
     vtkSmartPointer<vtkImageActor> m_mainActor;

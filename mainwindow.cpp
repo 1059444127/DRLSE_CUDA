@@ -68,8 +68,6 @@
 
 using namespace std;
 
-MainWindow* MainWindow::instance;
-
 MainWindow::MainWindow()
 {
     //Configure the ui
@@ -87,11 +85,6 @@ MainWindow::MainWindow()
     m_renderer->SetBackground2(0.1, 0.1, 0.1);
 
     this->ui->qvtkWidget->GetRenderWindow()->AddRenderer(m_renderer);
-
-    if(MainWindow::instance == nullptr)
-    {
-        MainWindow::instance = this;
-    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -131,10 +124,12 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
 
     auto eventPos = style->GetInteractor()->GetEventPosition();
 
-    auto mainActor = MainWindow::instance->GetActor();
-    auto picker = MainWindow::instance->GetPicker();
-    auto renderer = MainWindow::instance->GetRenderer();
-    auto cornerAnn = MainWindow::instance->GetCornerAnnotation();
+    auto mw = MainWindow::GetInstance();
+
+    auto mainActor = mw.GetActor();
+    auto picker = mw.GetPicker();
+    auto renderer = mw.GetRenderer();
+    auto cornerAnn = mw.GetCornerAnnotation();
     auto image = mainActor->GetInput();
 
     picker->Pick(eventPos[0], eventPos[1], 0, renderer);
@@ -200,7 +195,7 @@ void MouseMoveCallbackFunction(vtkObject* caller, unsigned long eid, void* clien
     cornerAnn->SetText(0, fullMessage.c_str());
 
     //Get current windowing info, and add text on bottom right with WW and WC
-    auto imageProperty = MainWindow::instance->GetActor()->GetProperty();
+    auto imageProperty = MainWindow::GetInstance().GetActor()->GetProperty();
     if(imageProperty != nullptr)
     {
         auto window = imageProperty->GetColorWindow();

@@ -22,8 +22,16 @@
 #define VTK_NEW(type, instance); vtkSmartPointer<type> instance = vtkSmartPointer<type>::New();
 
 
+CUDADriver::CUDADriver()
+{
+    if(CUDADriver::instance == nullptr)
+    {
+        CUDADriver::instance = this;
+    }
+}
 
-vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
+
+vtkSmartPointer<vtkImageData> CUDADriver::testSobelFilter(vtkImageData* input)
 {
     int* inputDims = input->GetDimensions();
 
@@ -79,7 +87,7 @@ vtkSmartPointer<vtkImageData> testSobelFilter(vtkImageData* input)
     return outputImage;
 }
 
-vtkSmartPointer<vtkImageData> testGaussianFilter(vtkImageData* input)
+vtkSmartPointer<vtkImageData> CUDADriver::testGaussianFilter(vtkImageData* input)
 {
     int* inputDims = input->GetDimensions();
 
@@ -127,7 +135,7 @@ vtkSmartPointer<vtkImageData> testGaussianFilter(vtkImageData* input)
     return outputImage;
 }
 
-vtkSmartPointer<vtkImageData> testEdgeIndicator(vtkImageData* input)
+vtkSmartPointer<vtkImageData> CUDADriver::testEdgeIndicator(vtkImageData* input)
 {
     int* inputDims = input->GetDimensions();
 
@@ -175,7 +183,7 @@ vtkSmartPointer<vtkImageData> testEdgeIndicator(vtkImageData* input)
     return outputImage;
 }
 
-void initLevelSets(vtkImageData* dicomInput, vtkImageData* polylineInput)
+void CUDADriver::initLevelSets(vtkImageData* dicomInput, vtkImageData* polylineInput)
 {
     int* inputDims = dicomInput->GetDimensions();
 
@@ -209,7 +217,7 @@ void initLevelSets(vtkImageData* dicomInput, vtkImageData* polylineInput)
     }
 }
 
-vtkSmartPointer<vtkImageData> iterateLevelSets(unsigned int numIters)
+vtkSmartPointer<vtkImageData> CUDADriver::iterateLevelSets(unsigned int numIters)
 {
     return nullptr;
 }
